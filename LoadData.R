@@ -1,3 +1,11 @@
+###### Here is the url on how to use GitHub and RStudio together ####
+#### note that you have to open a shell to add in new branches ###
+### http://r-bio.github.io/intro-git-rstudio/ ###
+
+### Once you have made changes, go to the GIT icon in the menu bar and commit changes. 
+
+
+
 rm(list = ls())
 
 #### required libraries ####
