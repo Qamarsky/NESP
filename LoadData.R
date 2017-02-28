@@ -4,6 +4,8 @@
 
 ### Once you have made changes, go to the GIT icon in the menu bar and commit changes. 
 
+## once changes are finished, open shell and type 'git push origin proposed-fixes' (Note that
+# proposed-fixes is the name of the branch you chose when you originated this branch)
 
 
 rm(list = ls())
