@@ -8,6 +8,12 @@
 # proposed-fixes is the name of the branch you chose when you originated this branch)
 
 
+
+### to get the newest version of the files into R's folder use the command: git pull <remote> <branch>
+## In this case we have set the remote file to be called origin, and the branch we are working on is master
+## so command is: 'git pull origin master'
+
+
 rm(list = ls())
 
 #### required libraries ####
