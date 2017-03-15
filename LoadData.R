@@ -2,6 +2,18 @@
 #### note that you have to open a shell to add in new branches ###
 ### http://r-bio.github.io/intro-git-rstudio/ ###
 
+##Open shell (Tools>Shell in R Studio) and give it the upstream address:
+## git remote add upstream https://github.com/Qamarsky/NESP.git. 
+## Make sure that it worked by typing git remote -v, 
+## it should display 4 lines, 2 that start with origin and the address of your fork, 
+## and 2 that start with upstream and the address of the upstream repository. 
+
+# Note that here we used upstream to name the upstream repository but we could have given it another name
+
+## Create a branch for the changes in R studio through the shell: 
+## git checkout -b proposed-fixes master. Proposed-fixes is our branch name within this R studio project.
+
+
 ### Once you have made changes, go to the GIT icon in the menu bar and commit changes. 
 
 ## once changes are finished, open shell and type 'git push origin proposed-fixes' (Note that
@@ -25,6 +37,7 @@ library(ggplot2)
 library(googleVis)
 library(multcomp)
 library(rdrop2)
+library(httpuv)
 
 
 ##### Add in transect data ####
@@ -37,9 +50,9 @@ Covars<-drop_read_csv("/NESP/Data/Transect data/Transect_data_all_170217.csv", s
 Landcov<-drop_read_csv("/NESP/Data/landuse.csv")
 KABsite<-drop_read_csv("/NESP/Data/Transect data/KAB/KAB_site_types.csv")
 
-Covars$Year <-as.POSIXlt(strptime(as.character(Transect$Date), format = "%d/%m/%Y"))$year+1900
-Covars$Month <- as.POSIXlt(strptime(as.character(Transect$Date), format = "%d/%m/%Y"))$mon+1
-Covars$Day <- as.POSIXlt(strptime(as.character(Transect$Date), format = "%d/%m/%Y"))$mday
+Covars$Year <-as.POSIXlt(strptime(as.character(Covars$Date), format = "%d/%m/%Y"))$year+1900
+Covars$Month <- as.POSIXlt(strptime(as.character(Covars$Date), format = "%d/%m/%Y"))$mon+1
+Covars$Day <- as.POSIXlt(strptime(as.character(Covars$Date), format = "%d/%m/%Y"))$mday
 
 Covars$Source<-as.factor(Covars$Source)
 
@@ -90,7 +103,7 @@ CUA[,152]<-as.numeric(paste(CUA[,152]))
 CUA[,156]<-as.numeric(paste(CUA[,156]))
 CUA[,173]<-as.numeric(paste(CUA[,173]))
 
-CUA$Total_Debris<-rowSums(CUA2[,c(87:109,112:159,161,163:180)], na.rm=TRUE)  ## for some reason many of these rows are not numeric
+CUA$Total_Debris<-rowSums(CUA[,c(87:109,112:159,161,163:180)], na.rm=TRUE)  ## for some reason many of these rows are not numeric
 
 #### Total takes into account the length in meters of wire, pvc, etc. While total calc does not.
 
