@@ -45,7 +45,10 @@ library(httpuv)
 drop_auth()
 drop_dir(path="/NESP")
 
-Covars<-drop_read_csv("/NESP/Data/Transect data/Transect_data_all_170217.csv", stringsAsFactors=FALSE)
+#Covars<-drop_read_csv("/NESP/Data/Transect data/Transect_data_all_170217.csv", stringsAsFactors=FALSE)
+Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_160317_UID.csv", stringsAsFactors=FALSE)
+
+
 
 Landcov<-drop_read_csv("/NESP/Data/landuse.csv")
 KABsite<-drop_read_csv("/NESP/Data/Transect data/KAB/KAB_site_types.csv")
