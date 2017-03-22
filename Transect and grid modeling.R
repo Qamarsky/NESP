@@ -1,7 +1,14 @@
-Covars2<-Covars
+
+### set up dropbox ###
+
+drop_auth()
+drop_dir(path="/NESP")
+
 
 ######## Ctree #########
 ### Now let's start to get some tree action happening. First try CUA and KAB separately
+
+### We have already done the modelling for full data set, so we should just be able to use this model...
 
 CUA.M1<-ctree(Totalper1000m2~State+ RailDist + TotalRds50 + Prim.land + pop50km + N.Vols + IllegalDump, data=CUA.Sub)
 
@@ -37,8 +44,8 @@ G.Cs.M2<-ctree(Totper1000 ~ RailDistKM + State + All_roads_50 + Prim.land + Pop_
 
 ## add in the resids
 
-G.K.M2<-ctree(TotalDebris ~ RailDistKM + State + All_roads_50 + Prim.land + Pop_50km + 
-                Eco_resour_50km + Eco_advan_50km + Edu_occupa_50km + Eco_disadv_50km + 
+G.K.M2<-ctree(Total_Debris ~ RailDistKM + State + All_roads_50 + Prim.land + Pop_50km + 
+                eco_resour50km + Eco_advan_50km + Edu_occupa50km + eco_disadv50km + 
                 roads_5to50km_resids + Pop5to50km_resids,
               data=Covars2[Covars2$Source=="KAB",])
 
@@ -46,12 +53,12 @@ G.K.M2<-ctree(TotalDebris ~ RailDistKM + State + All_roads_50 + Prim.land + Pop_
 ## Predictions on CSIRO dat
 
 G.C.M1<-ctree(Totper1000 ~ RailDistKM + State + All_roads_50 + Prim.land + Pop_50km + 
-                Eco_resour_50km + Eco_advan_50km + Edu_occupa_50km + Eco_disadv_50km + 
+                eco_resour50km + Eco_advan_50km + Edu_occupa50km + eco_disadv50km + 
                 roads_5to50km_resids + Pop5to50km_resids,
               data=Covars2[Covars2$Source=="CSIRO",])
 
 G.Call.M1<-ctree(Totper1000 ~ RailDistKM + State + All_roads_50 + Prim.land + Pop_50km + 
-                   Eco_resour_50km + Eco_advan_50km + Edu_occupa_50km + Eco_disadv_50km + 
+                   eco_resour50km + Eco_advan_50km + Edu_occupa50km + eco_disadv50km + 
                    roads_5to50km_resids + Pop5to50km_resids,
                  data=Covars2[Covars2$Source=="Emu" | Covars2$Source=="Transect" | Covars2$Source=="CSIRO",])
 
@@ -62,18 +69,25 @@ plot(G.K.M2, type="simple", cex=0.5)
 
 ### create predictions with grid cells ####
 
-Grid<-drop_read_csv("NESP/Grid/grid_covars_100816.csv") ### fix file name
+Grid<-drop_read_csv("NESP/Data/Grid data/Sydney_fishnet_centrepoints_covars_170320.csv", stringsAsFactors=FALSE) ### fix file name
 Grid$State<-as.factor(rep("NSW", times=dim(Grid)[1]))
 Grid$Prim.land<-Landcov$PRIMARY_V7[match(Grid$Landuse, Landcov$Landuse)]
 
+Grid$All_roads_50<-rowSums(Grid[,57:61], na.rm=TRUE)
+Grid$All_roads_5<-rowSums(Grid[,42:46], na.rm=TRUE)
+Grid$roads_5to50km_resids<-lm(Grid$All_roads_5 ~ Grid$All_roads_50)$residuals
+Grid$Pop5to50km_resids<-lm(Grid$Pop_5km ~ Grid$Pop_50km)$residuals
 
-Grid$pred<-predict(G.K.M2, newdata=Grid,type="response",se.fit = TRUE, na.action = na.pass)
+Grid2<-Grid[Grid$Landuse!=0,]
 
-### Can't do Grid predictions, so let's look at transect sites in Sydney only.
+#### Note that these predictions are using incorrect roads data - need to fix. 
+Grid2$pred<-predict(G.K.M2, newdata=Grid2,type="response",se.fit = TRUE, na.action = na.pass)
 
-Syd_Covars<-Covars2[Covars2$Lat < (-33.671774)  & Covars2$Lat > (-34.265774) & Covars2$Long < (151.372906) & Covars2$Lat > (150.718096)]
 
-Syd_KAB<-Syd_Covars[Syd_Covars$Source=="KAB"]
+Syd_Covars<-Covars2[Covars2$Lat <= (-33.671774)  & Covars2$Lat >= (-34.265774) & Covars2$Long <= (151.372906) & Covars2$Long >= (150.718096),]
+
+
+Syd_KAB<-Syd_Covars[Syd_Covars$Source=="KAB",]
 Syd_CSIRO<-Syd_Covars[Syd_Covars$Source=="CSIRO",]
 Syd_CSall<-Syd_Covars[Syd_Covars$Source=="Emu" | Syd_Covars$Source==
                            "Transect" | Syd_Covars$Source=="CSIRO",]
@@ -97,43 +111,24 @@ Syd_all<-rbind(Syd_CSIRO, Syd_KAB)
 
 #system.time(Wind<-read.csv("~/Documents/R data/NOAAOC/APC/Wind transport matrix unique", sep=","))
 
-Winddf<-drop_read_csv("NESP/Wind transport matrix unique")
+Winddf<-drop_read_csv("NESP/analysis/Wind transport/Wind transport matrix.GridToSurveys.csv")
 
 
 ## importing distance matrix one by one - deprecated if Sydney Dist matrix is smaller!!
 
-Distdf<-read.csv("~/Documents/R data/NOAAOC/APC/Distance matrix unique", nrows=50000)
-Distdf2<-read.csv("~/Documents/R data/NOAAOC/APC/Distance matrix unique", skip=50000, nrows=50000)
-Distdf3<-read.csv("~/Documents/R data/NOAAOC/APC/Distance matrix unique", skip=100000, nrows=50000)
-Distdf4<-read.csv("~/Documents/R data/NOAAOC/APC/Distance matrix unique", skip=150000, nrows=50000)
-Distdf5<-read.csv("~/Documents/R data/NOAAOC/APC/Distance matrix unique", skip=200000, nrows=50000)
-Distdf6<-read.csv("~/Documents/R data/NOAAOC/APC/Distance matrix unique", skip=250000, nrows=50000)
-Distdf7<-read.csv("~/Documents/R data/NOAAOC/APC/Distance matrix unique", skip=300000)
+Winddf<-drop_read_csv("NESP/analysis/Wind transport/Wind transport matrix.GridToSurveys.csv")
 
-names(Distdf2)<-names(Distdf)
-names(Distdf3)<-names(Distdf)
-names(Distdf4)<-names(Distdf)
-names(Distdf5)<-names(Distdf)
-names(Distdf6)<-names(Distdf)
-names(Distdf7)<-names(Distdf)
-
-Distrest<-rbind(Distdf2, Distdf3, Distdf4, Distdf5, Distdf6, Distdf7)
-rownames(Distrest)<-Distrest[,1]
-Distrest<-Distrest[,-1]
-names(Distrest)<-names(Distdf)
-
-Distall<-rbind(Distdf, Distrest)
-save(Distall, file="Distdf")
-Distdf<-Distall
+Distdf<-drop_read_csv("NESP/analysis/Wind transport/Distance matrix.GridToSurveys.csv")
 
 
-WindGridMatch<-colnames(Winddf) ## might need to play with this somewhat...
-WindGridMatch<-substring(WindGridMatch,2)
-WindGridMatch<-as.numeric(WindGridMatch)
 
-TotalDebris<-read.csv("~/Documents/R data/NOAAOC/APC/predicted load on the grid (1).csv")
-rownames(TotalDebris)<-rownames(Winddf)
-TotalDebris$Unique_ID<-rownames(Winddf)
+#WindGridMatch<-colnames(Winddf) ## might need to play with this somewhat...
+#WindGridMatch<-substring(WindGridMatch,2)
+#WindGridMatch<-as.numeric(WindGridMatch)
+
+TotalDebris<-Grid2$pred
+#rownames(TotalDebris)<-Grid2$UID
+TotalDebris$Unique_ID<-Grid2$UID
 #TotalDebris<-as.vector(TotalDebris)
 
 ## because we don't actually have total debris predicted per each cell, the best hyptheses we can make are:
