@@ -4,6 +4,8 @@
 drop_auth()
 drop_dir(path="/NESP")
 
+##
+setwd("/Users/uqqschuy/Documents/R data/NESP")
 
 ######## Ctree #########
 ### Now let's start to get some tree action happening. First try CUA and KAB separately
@@ -69,19 +71,42 @@ plot(G.K.M2, type="simple", cex=0.5)
 
 ### create predictions with grid cells ####
 
-Grid<-drop_read_csv("NESP/Data/Grid data/Sydney_fishnet_centrepoints_covars_170320.csv", stringsAsFactors=FALSE) ### fix file name
+Grid<-drop_read_csv("NESP/Data/Grid data/Syd_fishnet_centerpoints_covars_170328_inland.csv", stringsAsFactors=FALSE) ### fix file name
 Grid$State<-as.factor(rep("NSW", times=dim(Grid)[1]))
-Grid$Prim.land<-Landcov$PRIMARY_V7[match(Grid$Landuse, Landcov$Landuse)]
 
 Grid$All_roads_50<-rowSums(Grid[,57:61], na.rm=TRUE)
 Grid$All_roads_5<-rowSums(Grid[,42:46], na.rm=TRUE)
+
+#### There are a few where landuse is 0 because the cells are on the coast. Let's create a string of
+## UIDs that we can use to get rid of all cells for all products. 
+
+## Don't have to do these two steps once they are properly integrated
+Grid2<-drop_read_csv("NESP/Data/Grid data/Sydney_fishnet_centerpoints_covars_230317_inland.csv", stringsAsFactors=FALSE)
+Grid$Landuse<-Grid2$Landuse
+
+Grid$Prim.land<-Landcov$PRIMARY_V7[match(Grid$Landuse, Landcov$Landuse)]
+
+
+
+watercells<-Grid$UID[Grid$Landuse==(-9999)] ### This should become Grid later, not Grid2
+
+index<-Grid2$Landuse!=(-9999)
+
+
+Grid<-Grid[index,]
+
+
 Grid$roads_5to50km_resids<-lm(Grid$All_roads_5 ~ Grid$All_roads_50)$residuals
 Grid$Pop5to50km_resids<-lm(Grid$Pop_5km ~ Grid$Pop_50km)$residuals
 
-Grid2<-Grid[Grid$Landuse!=0,]
+#### CHECKING DATA #####
+length(Grid2$UID[Grid2$Landuse==(-9999)])
+### For some reason there are missing 5 and 50km roads. 
+wrongroads<-Grid$UID[Grid$All_roads_5==0| Grid$All_roads_50==0]
 
+write.csv (wrongroads, file="anomalousroads.csv")
 #### Note that these predictions are using incorrect roads data - need to fix. 
-Grid2$pred<-predict(G.K.M2, newdata=Grid2,type="response",se.fit = TRUE, na.action = na.pass)
+Grid$pred<-predict(G.K.M2, newdata=Grid,type="response",se.fit = TRUE, na.action = na.pass)
 
 
 Syd_Covars<-Covars2[Covars2$Lat <= (-33.671774)  & Covars2$Lat >= (-34.265774) & Covars2$Long <= (151.372906) & Covars2$Long >= (150.718096),]
@@ -103,6 +128,30 @@ Syd_CSall$resids<-Syd_CSall$Totper1000-Syd_CSall$pred
 
 Syd_all<-rbind(Syd_CSIRO, Syd_KAB)
 
+
+###### TEST GRID COVARS AGAINST TRANSECT COVARS #####
+
+Grid_subset<-Grid[Grid$UID %in% unique(Syd_Covars$UID_1),]
+Syd_Covars_subset<-Syd_Covars[unique(Syd_Covars$UID_1),]
+
+matchindex<-match(Grid_subset$UID, Syd_Covars$UID_1)
+
+plot(Grid_subset$eco_resour10km, Syd_Covars$eco_resour10km[matchindex])
+
+
+### a few of the transects don't end up in the grid, I think because the grid cell was perhaps cut off. 
+## How shall we address this?
+
+Grid$UID<-as.character(Grid$UID)
+write.csv(unique(Syd_Covars$UID_1[Syd_Covars$UID_1 %nin% Grid$UID]), file="transectinwater.csv")
+
+## TJ went back and changed the UID for these transects to the nearest UID. 
+
+
+## provide csv to Chris and Kimberley because they will need for Winddf and Waterdf and Distdf
+write.csv(Grid[,c("UID","X","Y")], file="new UIDs for transit matrices.csv")
+
+
 ###### Make predictions with wind and water transport. ####
 
 # Given a transit matrix (e.g. wind)
@@ -112,23 +161,19 @@ Syd_all<-rbind(Syd_CSIRO, Syd_KAB)
 #system.time(Wind<-read.csv("~/Documents/R data/NOAAOC/APC/Wind transport matrix unique", sep=","))
 
 Winddf<-drop_read_csv("NESP/analysis/Wind transport/Wind transport matrix.GridToSurveys.csv")
-
-
-## importing distance matrix one by one - deprecated if Sydney Dist matrix is smaller!!
-
-Winddf<-drop_read_csv("NESP/analysis/Wind transport/Wind transport matrix.GridToSurveys.csv")
+Winddf<-Winddf[rownames(Winddf) %nin% watercells,] ## remove those cells that are over water and have no covars
 
 Distdf<-drop_read_csv("NESP/analysis/Wind transport/Distance matrix.GridToSurveys.csv")
-
+Distdf<-Distdf[rownames(Distdf) %nin% watercells,] ## remove cells that are over water and have no covars
 
 
 #WindGridMatch<-colnames(Winddf) ## might need to play with this somewhat...
 #WindGridMatch<-substring(WindGridMatch,2)
 #WindGridMatch<-as.numeric(WindGridMatch)
 
-TotalDebris<-Grid2$pred
+TotalDebris<-Grid[,c("pred","UID")]
 #rownames(TotalDebris)<-Grid2$UID
-TotalDebris$Unique_ID<-Grid2$UID
+
 #TotalDebris<-as.vector(TotalDebris)
 
 ## because we don't actually have total debris predicted per each cell, the best hyptheses we can make are:

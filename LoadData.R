@@ -46,7 +46,7 @@ drop_auth()
 drop_dir(path="/NESP")
 
 #Covars<-drop_read_csv("/NESP/Data/Transect data/Transect_data_all_170217.csv", stringsAsFactors=FALSE)
-Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_160317_UID.csv", stringsAsFactors=FALSE)
+Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_290317_UID.csv", stringsAsFactors=FALSE)
 
 
 
@@ -187,5 +187,5 @@ Covars2$Pop5to50km_resids <- lm(Covars2$Pop_5km ~ Covars2$Pop_50km)$residuals
 
 
 
-drop_upload("~/Documents/R data/NESP/R scripts/LoadData.R", dest="/NESP/R scripts")
+#drop_upload("~/Documents/R data/NESP/R scripts/LoadData.R", dest="/NESP/R scripts")
 
