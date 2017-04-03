@@ -142,10 +142,15 @@ plot(Grid_subset$eco_resour10km, Syd_Covars$eco_resour10km[matchindex])
 ### a few of the transects don't end up in the grid, I think because the grid cell was perhaps cut off. 
 ## How shall we address this?
 
-
-write.csv(unique(Syd_Covars$UID[Syd_Covars$UID_1 %nin% Grid$UID]), file="transectinwater.csv")
+Grid$UID<-as.character(Grid$UID)
+write.csv(unique(Syd_Covars$UID_1[Syd_Covars$UID_1 %nin% Grid$UID]), file="transectinwater.csv")
 
 ## TJ went back and changed the UID for these transects to the nearest UID. 
+
+
+## provide csv to Chris and Kimberley because they will need for Winddf and Waterdf and Distdf
+write.csv(Grid[,c("UID","X","Y")], file="new UIDs for transit matrices.csv")
+
 
 ###### Make predictions with wind and water transport. ####
 
@@ -156,23 +161,19 @@ write.csv(unique(Syd_Covars$UID[Syd_Covars$UID_1 %nin% Grid$UID]), file="transec
 #system.time(Wind<-read.csv("~/Documents/R data/NOAAOC/APC/Wind transport matrix unique", sep=","))
 
 Winddf<-drop_read_csv("NESP/analysis/Wind transport/Wind transport matrix.GridToSurveys.csv")
-
-
-## importing distance matrix one by one - deprecated if Sydney Dist matrix is smaller!!
-
-Winddf<-drop_read_csv("NESP/analysis/Wind transport/Wind transport matrix.GridToSurveys.csv")
+Winddf<-Winddf[rownames(Winddf) %nin% watercells,] ## remove those cells that are over water and have no covars
 
 Distdf<-drop_read_csv("NESP/analysis/Wind transport/Distance matrix.GridToSurveys.csv")
-
+Distdf<-Distdf[rownames(Distdf) %nin% watercells,] ## remove cells that are over water and have no covars
 
 
 #WindGridMatch<-colnames(Winddf) ## might need to play with this somewhat...
 #WindGridMatch<-substring(WindGridMatch,2)
 #WindGridMatch<-as.numeric(WindGridMatch)
 
-TotalDebris<-Grid2$pred
+TotalDebris<-Grid[,c("pred","UID")]
 #rownames(TotalDebris)<-Grid2$UID
-TotalDebris$Unique_ID<-Grid2$UID
+
 #TotalDebris<-as.vector(TotalDebris)
 
 ## because we don't actually have total debris predicted per each cell, the best hyptheses we can make are:
