@@ -38,6 +38,7 @@ library(googleVis)
 library(multcomp)
 library(rdrop2)
 library(httpuv)
+library(Hmisc)
 
 
 ##### Add in transect data ####
@@ -46,7 +47,8 @@ drop_auth()
 drop_dir(path="/NESP")
 
 #Covars<-drop_read_csv("/NESP/Data/Transect data/Transect_data_all_170217.csv", stringsAsFactors=FALSE)
-Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_290317_UID.csv", stringsAsFactors=FALSE)
+#Covarsx<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_290317_UID.csv", stringsAsFactors=FALSE)
+Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_040417_UID.csv", stringsAsFactors=FALSE)
 
 
 

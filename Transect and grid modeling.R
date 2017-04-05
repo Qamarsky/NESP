@@ -7,6 +7,10 @@ drop_dir(path="/NESP")
 ##
 setwd("/Users/uqqschuy/Documents/R data/NESP")
 
+
+##### libraries #####
+library(Hmisc)
+
 ######## Ctree #########
 ### Now let's start to get some tree action happening. First try CUA and KAB separately
 
@@ -112,6 +116,7 @@ Grid$pred<-predict(G.K.M2, newdata=Grid,type="response",se.fit = TRUE, na.action
 Syd_Covars<-Covars2[Covars2$Lat <= (-33.671774)  & Covars2$Lat >= (-34.265774) & Covars2$Long <= (151.372906) & Covars2$Long >= (150.718096),]
 
 
+
 Syd_KAB<-Syd_Covars[Syd_Covars$Source=="KAB",]
 Syd_CSIRO<-Syd_Covars[Syd_Covars$Source=="CSIRO",]
 Syd_CSall<-Syd_Covars[Syd_Covars$Source=="Emu" | Syd_Covars$Source==
@@ -137,6 +142,8 @@ Syd_Covars_subset<-Syd_Covars[unique(Syd_Covars$UID_1),]
 matchindex<-match(Grid_subset$UID, Syd_Covars$UID_1)
 
 plot(Grid_subset$eco_resour10km, Syd_Covars$eco_resour10km[matchindex])
+plot(Grid_subset$Pop_50km, Syd_Covars$Pop_50km[matchindex])
+
 
 
 ### a few of the transects don't end up in the grid, I think because the grid cell was perhaps cut off. 
@@ -151,8 +158,12 @@ write.csv(unique(Syd_Covars$UID_1[Syd_Covars$UID_1 %nin% Grid$UID]), file="trans
 ## provide csv to Chris and Kimberley because they will need for Winddf and Waterdf and Distdf
 write.csv(Grid[,c("UID","X","Y")], file="new UIDs for transit matrices.csv")
 
-
 ###### Make predictions with wind and water transport. ####
+
+#### Note that there are some grids in Sydney that have been cut out due to lack of data,
+### probably NAs in the debris/km or something of the sort
+### so there are more wind and water transit cells than in the Covars2 dataset. 
+## this should not be a problem, just to know...
 
 # Given a transit matrix (e.g. wind)
 
@@ -163,11 +174,20 @@ write.csv(Grid[,c("UID","X","Y")], file="new UIDs for transit matrices.csv")
 Winddf<-drop_read_csv("NESP/analysis/Wind transport/Wind transport matrix.GridToSurveys.csv")
 Winddf<-Winddf[rownames(Winddf) %nin% watercells,] ## remove those cells that are over water and have no covars
 
+#Windnames<-colnames(Winddf)
+colnames(Winddf)<-substring(colnames(Winddf),2)
+colnames(Winddf)<-sub("^([^.]*.[^.]*).", "\\1-",colnames(Winddf))  ### for some reason Chris' file has changed the "-" to a ".". this changes it back
+
+#namematch<-match(Windnames, Covars2$UID_1)
+
+
 Distdf<-drop_read_csv("NESP/analysis/Wind transport/Distance matrix.GridToSurveys.csv")
 Distdf<-Distdf[rownames(Distdf) %nin% watercells,] ## remove cells that are over water and have no covars
+colnames(Distdf)<-substring(colnames(Distdf),2)
+colnames(Distdf)<-sub("^([^.]*.[^.]*).", "\\1-",colnames(Distdf))  ### for some reason Chris' file has changed the "-" to a ".". this changes it back
 
 
-#WindGridMatch<-colnames(Winddf) ## might need to play with this somewhat...
+WindGridMatch<-colnames(Winddf) ## might need to play with this somewhat...
 #WindGridMatch<-substring(WindGridMatch,2)
 #WindGridMatch<-as.numeric(WindGridMatch)
 
@@ -195,9 +215,9 @@ WindSinkPos[WindSinkPos<0]<-0  ## basically changes all negative values to zeros
 
 ## Next few lines are for when we have debris 
 
-WindSinkPropPos<-sweep(WindSinkPos,2,colSums(WindSinkPos),`/`)
+WindSinkPropPos<-sweep(WindSinkPos,2,colSums(WindSinkPos),`/`) ### this gives you the proportion of wind transport from each grid cell (row) to each transect cell (column)
 
-# multiply proportion of debris in each cell that came frWindSinkTot<-sweep(WindSinkPropPos,1,TotalDebris,'*')
+# multiply proportion of wind in each cell by the amount of debris in that cell      WindSinkTot<-sweep(WindSinkPropPos,1,TotalDebris,'*')
 WindSinkTot<-WindSinkPropPos*TotalDebris[,1]
 WindSinkTotf<-colSums(WindSinkTot) ###MUST MATCH THIS WITH PROPER GRIDMATCH VALUES because total debris may be in different order from wind. 
 
@@ -225,14 +245,13 @@ UpwindDeb<-colSums(Windsignpos*TotalDebris[,1])
 
 ## Now we do upwind cells divided by distance
 Winddist<-Windsign/Distdf
-is.na(Winddist) <- do.call(cbind,lapply(Winddist, is.infinite)) ## change Inf values to NA
+#is.na(Winddist) <- do.call(cbind,lapply(Winddist, is.infinite)) ## change Inf values to NA
 
 WinddisttotNodeb<-colSums(Winddist, na.rm=TRUE) ## this is of course both pos and neg.
-Winddistpos<-Windsign
-Winddistpos[Winddistpos<0]<-0
+Winddistpos<-Windsignpos
 Winddistpos<-Winddistpos/Distdf
 
-is.na(Winddistpos) <- do.call(cbind,lapply(Winddistpos, is.infinite)) ## change Inf values to NA
+#is.na(Winddistpos) <- do.call(cbind,lapply(Winddistpos, is.infinite)) ## change Inf values to NA
 
 Winddistposonly<-colSums(Winddistpos, na.rm=TRUE)
 
@@ -252,10 +271,13 @@ write.csv(wind, file="wind.csv")
 
 ## Water matrix ###
 
-Water<-read.csv("~/Documents/R data/NOAAOC/APC/grid_water_sites_gridmatch_nodup.csv")
-Waternames<-Water[,1]
+Water<-drop_read_csv("NESP/Analysis/Water transport/sydney_fishnet_globaldata_costdist_170405.csv")
+rownames(Water)<-Water[,1]
 
 Water<-Water[,-1]
+Water<-Water[rownames(Water) %nin% watercells,] ## remove those cells that are over water and have no covars
+
+
 
 save(Water, file="Water")
 
