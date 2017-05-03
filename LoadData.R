@@ -48,8 +48,36 @@ drop_dir(path="/NESP")
 
 #Covars<-drop_read_csv("/NESP/Data/Transect data/Transect_data_all_170217.csv", stringsAsFactors=FALSE)
 #Covarsx<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_290317_UID.csv", stringsAsFactors=FALSE)
-Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_040417_UID.csv", stringsAsFactors=FALSE)
+Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_200417_UID.csv", stringsAsFactors=FALSE)
+#Covarsx<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_040417_UID.csv", stringsAsFactors=FALSE)
 
+
+### Find unique site values for Kimberley ###
+#Covars$LL<-paste(Covars$Long, Covars$Lat, sep="")
+
+#NewSEIF<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_070417_UID_SEIF2011.csv", stringsAsFactors=FALSE)
+#NewPop<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_070417_UID_POP2011.csv", stringsAsFactors=FALSE)
+
+#seifmatch<-match(Covars$LL, NewSEIF$UID)
+#popmatch<-match(Covars$LL, NewPop$UID)
+
+## not needed once everything is integrated into one data set ##
+#names(Covars)
+
+Covars$Eco_advan_1km_new<-NewSEIF$Eco_advan_1km[seifmatch]
+
+Covars[,24:43]<-NewSEIF[seifmatch,2:21]
+
+
+Covars$Pop_1km<-NewPop$Pop_1km[popmatch]
+Covars$Pop_5km<-NewPop$Pop_5km[popmatch]
+Covars$Pop_10km<-NewPop$Pop_10km[popmatch]
+Covars$Pop_25km<-NewPop$Pop_25km[popmatch]
+Covars$Pop_50km<-NewPop$Pop_50km[popmatch]
+
+write.csv(Covars, file="/Users/uqqschuy/Documents/R data/NESP/Global_dataset_200417_UID.csv")
+
+drop_upload("/Users/uqqschuy/Documents/R data/NESP/Global_dataset_200417_UID.csv", dest="/NESP/Data/Transect data/Global")
 
 
 Landcov<-drop_read_csv("/NESP/Data/landuse.csv")

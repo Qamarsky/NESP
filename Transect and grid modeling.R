@@ -75,43 +75,47 @@ plot(G.K.M2, type="simple", cex=0.5)
 
 ### create predictions with grid cells ####
 
-Grid<-drop_read_csv("NESP/Data/Grid data/Syd_fishnet_centerpoints_covars_170328_inland.csv", stringsAsFactors=FALSE) ### fix file name
+Grid<-drop_read_csv("NESP/Data/Grid data/Syd_fishnet_centerpoints_covars_200430_inland.csv", stringsAsFactors=FALSE)
+
+#GridSEIF<-drop_read_csv("NESP/Data/Grid data/Sydney_fishnet_centrepoints_seif2011_170412.csv", stringsAsFactors=FALSE) ### fix file name
+
+#Grid[,17:36]<-GridSEIF[,6:25]
+
+#write.csv(Grid, file="/Users/uqqschuy/Documents/R data/NESP/Syd_fishnet_centerpoints_covars_200430_inland.csv")
+
+#drop_upload("/Users/uqqschuy/Documents/R data/NESP/Syd_fishnet_centerpoints_covars_200430_inland.csv", dest="/NESP/Data/Grid data")
+
+
 Grid$State<-as.factor(rep("NSW", times=dim(Grid)[1]))
 
 Grid$All_roads_50<-rowSums(Grid[,57:61], na.rm=TRUE)
 Grid$All_roads_5<-rowSums(Grid[,42:46], na.rm=TRUE)
 
-#### There are a few where landuse is 0 because the cells are on the coast. Let's create a string of
-## UIDs that we can use to get rid of all cells for all products. 
 
-## Don't have to do these two steps once they are properly integrated
-Grid2<-drop_read_csv("NESP/Data/Grid data/Sydney_fishnet_centerpoints_covars_230317_inland.csv", stringsAsFactors=FALSE)
-Grid$Landuse<-Grid2$Landuse
+
+#Gridtest<-read.csv("/Users/uqqschuy/Documents/R data/NESP/NESP/Sydney_fishnet_centrepoints_seif2011_170412.csv", stringsAsFactors=FALSE)
+
+
+#### There are a few where landuse is -9999 because the cells are close to the water or on the water. 
+# Change these to water landcover
+
+## Note that there were other cells where landuse was 0, TJ has changed them to nearest landuse value. 
+
+Grid$Landuse[Grid$Landuse<0]<-"663"
 
 Grid$Prim.land<-Landcov$PRIMARY_V7[match(Grid$Landuse, Landcov$Landuse)]
-
-
-
-watercells<-Grid$UID[Grid$Landuse==(-9999)] ### This should become Grid later, not Grid2
-
-index<-Grid2$Landuse!=(-9999)
-
-
-Grid<-Grid[index,]
-
 
 Grid$roads_5to50km_resids<-lm(Grid$All_roads_5 ~ Grid$All_roads_50)$residuals
 Grid$Pop5to50km_resids<-lm(Grid$Pop_5km ~ Grid$Pop_50km)$residuals
 
 #### CHECKING DATA #####
-length(Grid2$UID[Grid2$Landuse==(-9999)])
+#length(Grid2$UID[Grid2$Landuse==(-9999)])
 ### For some reason there are missing 5 and 50km roads. 
 wrongroads<-Grid$UID[Grid$All_roads_5==0| Grid$All_roads_50==0]
 
 write.csv (wrongroads, file="anomalousroads.csv")
 #### Note that these predictions are using incorrect roads data - need to fix. 
 Grid$pred<-predict(G.K.M2, newdata=Grid,type="response",se.fit = TRUE, na.action = na.pass)
-
 
 Syd_Covars<-Covars2[Covars2$Lat <= (-33.671774)  & Covars2$Lat >= (-34.265774) & Covars2$Long <= (151.372906) & Covars2$Long >= (150.718096),]
 
@@ -137,20 +141,49 @@ Syd_all<-rbind(Syd_CSIRO, Syd_KAB)
 ###### TEST GRID COVARS AGAINST TRANSECT COVARS #####
 
 Grid_subset<-Grid[Grid$UID %in% unique(Syd_Covars$UID_1),]
+## for test
+#Gridtest_subset<-Gridtest[Gridtest$UID %in% unique(Syd_Covars$UID_1),]
+
 Syd_Covars_subset<-Syd_Covars[unique(Syd_Covars$UID_1),]
 
 matchindex<-match(Grid_subset$UID, Syd_Covars$UID_1)
 
-plot(Grid_subset$eco_resour10km, Syd_Covars$eco_resour10km[matchindex])
-plot(Grid_subset$Pop_50km, Syd_Covars$Pop_50km[matchindex])
 
 
+plot(Grid_subset$Eco_advan_50km, Syd_Covars$Eco_advan_50km[matchindex])
+
+plot(Grid_subset$eco_resour50km, Syd_Covars$eco_resour50km[matchindex])
+
+## with new grid variable
+plot(Gridtest_subset$eco_resour5km, Syd_Covars$eco_resour5km[matchindex])
+
+
+plot(Grid_subset$Pop_25km, Syd_Covars$Pop_25km_new[matchindex])
+
+
+### some issues...trying to work them out ####
+
+Syd_subset<-Syd_Covars[matchindex,]
+index<-Syd_subset$Pop_50km<2000000
+plot(Grid_subset$Pop_50km[index], Syd_subset$Pop_50km[index])
+index2<-Syd_subset$Pop_25<400000
+plot(Grid_subset$Pop_25km[index2],Syd_subset$Pop_25km[index2])
+
+index3<-Grid_subset$UID[Grid_subset$eco_resour50km<850]
+
+write.csv(Syd_subset[index2,], file="25km anomalies for TJ.csv")
+write.csv(Syd_subset[Syd_subset$UID_1 %in% index3,],"50km eco_resource anomaly for TJ.csv")
 
 ### a few of the transects don't end up in the grid, I think because the grid cell was perhaps cut off. 
 ## How shall we address this?
 
 Grid$UID<-as.character(Grid$UID)
 write.csv(unique(Syd_Covars$UID_1[Syd_Covars$UID_1 %nin% Grid$UID]), file="transectinwater.csv")
+
+
+Syd_UID2<-paste(Syd_Covars$Long, Syd_Covars$Lat, sep="")
+Grid_UID2<-paste(Grid$)
+
 
 ## TJ went back and changed the UID for these transects to the nearest UID. 
 
@@ -171,6 +204,8 @@ write.csv(Grid[,c("UID","X","Y")], file="new UIDs for transit matrices.csv")
 
 #system.time(Wind<-read.csv("~/Documents/R data/NOAAOC/APC/Wind transport matrix unique", sep=","))
 
+###### LOAD WIND #####
+
 Winddf<-drop_read_csv("NESP/analysis/Wind transport/Wind transport matrix.GridToSurveys.csv")
 Winddf<-Winddf[rownames(Winddf) %nin% watercells,] ## remove those cells that are over water and have no covars
 
@@ -180,11 +215,31 @@ colnames(Winddf)<-sub("^([^.]*.[^.]*).", "\\1-",colnames(Winddf))  ### for some 
 
 #namematch<-match(Windnames, Covars2$UID_1)
 
+###### LOAD DIST #####
 
 Distdf<-drop_read_csv("NESP/analysis/Wind transport/Distance matrix.GridToSurveys.csv")
 Distdf<-Distdf[rownames(Distdf) %nin% watercells,] ## remove cells that are over water and have no covars
 colnames(Distdf)<-substring(colnames(Distdf),2)
 colnames(Distdf)<-sub("^([^.]*.[^.]*).", "\\1-",colnames(Distdf))  ### for some reason Chris' file has changed the "-" to a ".". this changes it back
+
+
+##### LOAD WATER #####
+
+
+Water<-drop_read_csv("NESP/Analysis/Water transport/sydney_fishnet_globaldata_costdist_170405.csv")
+rownames(Water)<-Water[,1]
+
+Water<-Water[,-1]
+#Water<-Water[rownames(Water) %nin% watercells,] ## remove those cells that are over water and have no covars
+Water<-Water[rownames(Water) %in% rownames(Winddf),]
+
+save(Water, file="Water")
+
+### there is a chunk of the Water matrix that didn't get values because it's off of the DEM. So let's remove
+# these grid cells from Grid, Wind, and Dist matrices. 
+
+Grid<-Grid[Grid$UID %in% rownames(Water),]
+Winddf<-Winddf[rownames(Winddf) %in% rownames(Water),]
 
 
 WindGridMatch<-colnames(Winddf) ## might need to play with this somewhat...
@@ -271,15 +326,6 @@ write.csv(wind, file="wind.csv")
 
 ## Water matrix ###
 
-Water<-drop_read_csv("NESP/Analysis/Water transport/sydney_fishnet_globaldata_costdist_170405.csv")
-rownames(Water)<-Water[,1]
-
-Water<-Water[,-1]
-Water<-Water[rownames(Water) %nin% watercells,] ## remove those cells that are over water and have no covars
-
-
-
-save(Water, file="Water")
 
 Elevation<-read.csv("~/Documents/R data/NOAAOC/APC/grid_covars_100816_wtshd.csv")
 
