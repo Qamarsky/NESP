@@ -7,8 +7,113 @@ drop_dir(path="/NESP")
 ##
 setwd("/Users/uqqschuy/Documents/R data/NESP")
 
+
+##### libraries #####
+library(party)
+library(maps)
+library(ggmap)
+library(mgcv)
+library(ggplot2)
+library(googleVis)
+library(multcomp)
+library(rdrop2)
+library(httpuv)
+library(Hmisc)
+
 ######## Ctree #########
 ### Now let's start to get some tree action happening. First try CUA and KAB separately
+
+### New models with KAB data
+
+set.seed(4183)
+
+## need to fix up missing variables in Covars2 data. 
+
+KAB.M1New<- cforest(Total_Debris ~ State + Volunteers + RailDistKM + RoadDistKM + Area_m2 +
+                      Pop_1km + Pop_5km + Pop_10km + Pop_25km + Pop_50km + Eco_advan_1km +
+                      Eco_advan_5km + Eco_advan_25km + Eco_advan_50km + eco_disadv1km +
+                      eco_disadv5km + eco_disadv10km + eco_disadv25km + eco_disadv50km +
+                      eco_resour1km + eco_resour5km + eco_resour10km + eco_resour25km +
+                      eco_resour50km + Edu_occupa1km + Edu_occupa5km + Edu_occupa10km +
+                      Edu_occupa25km + Edu_occupa50km + All_roads_50 + All_roads_5 + 
+                      roads_5to50km_resids + Pop5to50km_resids,
+                 data =Covars2[Covars2$Source=="KAB",], 
+                 controls=cforest_unbiased(ntree=3000, mtry=10))
+
+
+varimp (KAB.M1New) ## this gives the importance of each of the variables
+
+VarKAB<-varimp (KAB.M1New, conditional = TRUE)
+
+## looks like it could be good to use conditional varimp (conditional= TRUE), bedcause that
+# "adjusts for correlations between predictor variables" see Strobl et al. (2008) for details. 
+
+#State           Volunteers           RailDistKM           RoadDistKM 
+#4075.5837               0.0000            1387.2227            2858.4099 
+#Area_m2              Pop_1km              Pop_5km             Pop_10km 
+#0.0000             770.4726             628.3146             973.3662 
+#Pop_25km             Pop_50km        Eco_advan_1km        Eco_advan_5km 
+#667.6906             621.4801             773.3326             811.1754 
+#Eco_advan_25km       Eco_advan_50km        eco_disadv1km        eco_disadv5km 
+#394.9986             512.3338            1247.5169            2078.1771 
+#eco_disadv10km       eco_disadv25km       eco_disadv50km        eco_resour1km 
+#1073.8336             473.2998             459.1648            1199.3072 
+#eco_resour5km       eco_resour10km       eco_resour25km       eco_resour50km 
+#1089.8802             639.5513             573.5218             708.0982 
+#Edu_occupa1km        Edu_occupa5km       Edu_occupa10km       Edu_occupa25km 
+#1388.8498             856.3418             614.1993             468.7135 
+#Edu_occupa50km         All_roads_50          All_roads_5 roads_5to50km_resids 
+#656.3565             846.9883             678.3464             683.0208 
+#Pop5to50km_resids 
+#1516.4880 
+
+
+
+### cforest trees don't have weights stored in the ensemble object
+### this should get the weights  http://stackoverflow.com/questions/19924402/cforest-prints-empty-tree
+
+y <- cforest(Species ~ ., data=iris, control=cforest_control(mtry=2))
+tr <- party:::prettytree(y@ensemble[[1]], names(y@data@get("input")))
+plot(new("BinaryTree", tree=tr, data=y@data, responses=y@responses))
+
+
+tr<-party:::prettytree(KAB.M1New@ensemble[[1]], names(KAB.M1New@data@get("input")))
+plot(new("BinaryTree", tree=tr, data=KAB.M1New@data, responses=KAB.M1New@responses))
+
+
+update_tree <- function(x) {
+  if(!x$terminal) {
+    x$left <- update_tree(x$left)
+    x$right <- update_tree(x$right)
+  } else {
+    x$weights <- x[[9]]
+    x$weights_ <- x[[9]]
+  }
+  x
+}
+
+
+tr_weights <- update_tree(tr)
+plot(new("BinaryTree", tree=tr_weights, data=KAB.M1New@data, responses=KAB.M1New@responses))
+
+
+### This should be a way to graph the output of the forest model
+## https://stats.stackexchange.com/questions/205664/is-there-a-method-to-plot-the-output-of-a-random-forest-in-r
+
+
+
+
+
+
+pt <- prettytree(KAB.M1New@ensemble[[1]], names(KAB.M1New@data@get("input"))) 
+nt <- new("BinaryTree") 
+nt@tree <- pt 
+nt@data <- KAB.M1New@data 
+nt@responses <- KAB.M1New@responses 
+
+plot(nt, type="simple")
+
+
 
 ### We have already done the modelling for full data set, so we should just be able to use this model...
 
@@ -69,323 +174,6 @@ plot(G.K.M2, type="simple", cex=0.5)
 
 
 
-### create predictions with grid cells ####
-
-Grid<-drop_read_csv("NESP/Data/Grid data/Syd_fishnet_centerpoints_covars_170328_inland.csv", stringsAsFactors=FALSE) ### fix file name
-Grid$State<-as.factor(rep("NSW", times=dim(Grid)[1]))
-
-Grid$All_roads_50<-rowSums(Grid[,57:61], na.rm=TRUE)
-Grid$All_roads_5<-rowSums(Grid[,42:46], na.rm=TRUE)
-
-#### There are a few where landuse is 0 because the cells are on the coast. Let's create a string of
-## UIDs that we can use to get rid of all cells for all products. 
-
-## Don't have to do these two steps once they are properly integrated
-Grid2<-drop_read_csv("NESP/Data/Grid data/Sydney_fishnet_centerpoints_covars_230317_inland.csv", stringsAsFactors=FALSE)
-Grid$Landuse<-Grid2$Landuse
-
-Grid$Prim.land<-Landcov$PRIMARY_V7[match(Grid$Landuse, Landcov$Landuse)]
-
-
-
-watercells<-Grid$UID[Grid$Landuse==(-9999)] ### This should become Grid later, not Grid2
-
-index<-Grid2$Landuse!=(-9999)
-
-
-Grid<-Grid[index,]
-
-
-Grid$roads_5to50km_resids<-lm(Grid$All_roads_5 ~ Grid$All_roads_50)$residuals
-Grid$Pop5to50km_resids<-lm(Grid$Pop_5km ~ Grid$Pop_50km)$residuals
-
-#### CHECKING DATA #####
-length(Grid2$UID[Grid2$Landuse==(-9999)])
-### For some reason there are missing 5 and 50km roads. 
-wrongroads<-Grid$UID[Grid$All_roads_5==0| Grid$All_roads_50==0]
-
-write.csv (wrongroads, file="anomalousroads.csv")
-#### Note that these predictions are using incorrect roads data - need to fix. 
-Grid$pred<-predict(G.K.M2, newdata=Grid,type="response",se.fit = TRUE, na.action = na.pass)
-
-
-Syd_Covars<-Covars2[Covars2$Lat <= (-33.671774)  & Covars2$Lat >= (-34.265774) & Covars2$Long <= (151.372906) & Covars2$Long >= (150.718096),]
-
-
-Syd_KAB<-Syd_Covars[Syd_Covars$Source=="KAB",]
-Syd_CSIRO<-Syd_Covars[Syd_Covars$Source=="CSIRO",]
-Syd_CSall<-Syd_Covars[Syd_Covars$Source=="Emu" | Syd_Covars$Source==
-                           "Transect" | Syd_Covars$Source=="CSIRO",]
-
-Syd_KAB$pred<-predict(G.K.M2, newdata=Syd_KAB, type="response", se.fit=TRUE, na.action=na.pass)
-Syd_KAB$resids<-Syd_KAB$Totper1000-Syd_KAB$pred
-
-Syd_CSIRO$pred<-predict(G.C.M1, newdata=Syd_CSIRO, type="response", se.fit=TRUE, na.action=na.pass)
-Syd_CSIRO$resids<-Syd_CSIRO$Totper1000-Syd_CSIRO$pred
-
-Syd_CSall$pred<-predict(G.Call.M1, newdata=Syd_CSall, type="response", se.fit=TRUE,na.action=na.pass)
-Syd_CSall$resids<-Syd_CSall$Totper1000-Syd_CSall$pred
-
-Syd_all<-rbind(Syd_CSIRO, Syd_KAB)
-
-
-###### TEST GRID COVARS AGAINST TRANSECT COVARS #####
-
-Grid_subset<-Grid[Grid$UID %in% unique(Syd_Covars$UID_1),]
-Syd_Covars_subset<-Syd_Covars[unique(Syd_Covars$UID_1),]
-
-matchindex<-match(Grid_subset$UID, Syd_Covars$UID_1)
-
-plot(Grid_subset$eco_resour10km, Syd_Covars$eco_resour10km[matchindex])
-
-
-### a few of the transects don't end up in the grid, I think because the grid cell was perhaps cut off. 
-## How shall we address this?
-
-Grid$UID<-as.character(Grid$UID)
-write.csv(unique(Syd_Covars$UID_1[Syd_Covars$UID_1 %nin% Grid$UID]), file="transectinwater.csv")
-
-## TJ went back and changed the UID for these transects to the nearest UID. 
-
-
-## provide csv to Chris and Kimberley because they will need for Winddf and Waterdf and Distdf
-write.csv(Grid[,c("UID","X","Y")], file="new UIDs for transit matrices.csv")
-
-
-###### Make predictions with wind and water transport. ####
-
-# Given a transit matrix (e.g. wind)
-
-## To get distribution from SOURCE (Cols) - First normalise proportions by row
-
-#system.time(Wind<-read.csv("~/Documents/R data/NOAAOC/APC/Wind transport matrix unique", sep=","))
-
-Winddf<-drop_read_csv("NESP/analysis/Wind transport/Wind transport matrix.GridToSurveys.csv")
-Winddf<-Winddf[rownames(Winddf) %nin% watercells,] ## remove those cells that are over water and have no covars
-
-Distdf<-drop_read_csv("NESP/analysis/Wind transport/Distance matrix.GridToSurveys.csv")
-Distdf<-Distdf[rownames(Distdf) %nin% watercells,] ## remove cells that are over water and have no covars
-
-
-#WindGridMatch<-colnames(Winddf) ## might need to play with this somewhat...
-#WindGridMatch<-substring(WindGridMatch,2)
-#WindGridMatch<-as.numeric(WindGridMatch)
-
-TotalDebris<-Grid[,c("pred","UID")]
-#rownames(TotalDebris)<-Grid2$UID
-
-#TotalDebris<-as.vector(TotalDebris)
-
-## because we don't actually have total debris predicted per each cell, the best hyptheses we can make are:
-# 1) Amont of debris is somehow related to how many upwind cells there are (upwind)
-# 2) Amount of debris is somehow related to how much total wind comes from those cells
-##  This you would do by adding the total positive values for every column
-## 3) And finally, you could relate to distance. The greater the distance, the less would be transported
-## so for this, take the sign of each wind direction, and multiply it by the distance. Then do an inverse
-## for each cell, so greater distances have less value. Then just add the postive values. This gives you basically the number
-## of upwind cells, weighted by distance.
-# 4) and of course finally you have straight predictions. 
-
-## 1) how many cells in each column are positive??
-upwind<-apply(Winddf, 2, function(x) { sum (x>0) })
-
-# this one only valid if we have debris preds for all grid cells 
-WindSinkPos<-Winddf
-WindSinkPos[WindSinkPos<0]<-0  ## basically changes all negative values to zeros - only counting the proportion of the debris that comes FROM sites
-
-## Next few lines are for when we have debris 
-
-WindSinkPropPos<-sweep(WindSinkPos,2,colSums(WindSinkPos),`/`)
-
-# multiply proportion of debris in each cell that came frWindSinkTot<-sweep(WindSinkPropPos,1,TotalDebris,'*')
-WindSinkTot<-WindSinkPropPos*TotalDebris[,1]
-WindSinkTotf<-colSums(WindSinkTot) ###MUST MATCH THIS WITH PROPER GRIDMATCH VALUES because total debris may be in different order from wind. 
-
-## This WindSinkPropPos gives me the proportion of the debris that is in my cell that came FROM every other cell.
-## so you can create a prediction grid (or portion thereof) that presumes that all cells are sinks, and all of the
-## debris in them came from somewhere else. So if we multiply every colsum proportion by the total amount of
-## debris that was predicted for each of our sites (since it's a subset), then we can ....
-
-
-
-#2 Just use straight colsums (for pos values)
-WindtotNoDeb<-colSums(WindSinkPos)
-
-#3) 
-
-Windsign<-Winddf
-Windsign[Winddf>0]<-1
-Windsign[Winddf<0]<-(-1)
-
-## We can do upwind cells times debris in each of those upwind cells. 
-Windsignpos<-Windsign
-Windsignpos[Windsignpos<0]<-0
-UpwindDeb<-colSums(Windsignpos*TotalDebris[,1])
-
-
-## Now we do upwind cells divided by distance
-Winddist<-Windsign/Distdf
-is.na(Winddist) <- do.call(cbind,lapply(Winddist, is.infinite)) ## change Inf values to NA
-
-WinddisttotNodeb<-colSums(Winddist, na.rm=TRUE) ## this is of course both pos and neg.
-Winddistpos<-Windsign
-Winddistpos[Winddistpos<0]<-0
-Winddistpos<-Winddistpos/Distdf
-
-is.na(Winddistpos) <- do.call(cbind,lapply(Winddistpos, is.infinite)) ## change Inf values to NA
-
-Winddistposonly<-colSums(Winddistpos, na.rm=TRUE)
-
-## Now let's do wind dist proportional, and multiply by debris
-
-Winddistprop<-sweep(Winddistpos,2,Winddistposonly,`/`) ##That way we don't run into NA values
-Winddistdeb<-colSums(Winddistprop*TotalDebris[,1], na.rm=T)
-
-wind<-data.frame(upwind, WindtotNoDeb,WinddisttotNodeb, Winddistposonly, WindSinkTotf, UpwindDeb, Winddistdeb, WindGridMatch)
-
-save(wind, file="wind")
-write.csv(wind, file="wind.csv")
-
-#WindSourceProp[data cols, not totals]<-Wind/rowSums(Wind[data cols])
-#WindSourceTot<-WindSourceProp[data columns]*Total_Debris
-#WindSourceTotf<-ColSums(WindSourceTot)
-
-## Water matrix ###
-
-Water<-read.csv("~/Documents/R data/NOAAOC/APC/grid_water_sites_gridmatch_nodup.csv")
-Waternames<-Water[,1]
-
-Water<-Water[,-1]
-
-save(Water, file="Water")
-
-Elevation<-read.csv("~/Documents/R data/NOAAOC/APC/grid_covars_100816_wtshd.csv")
-
-WaterGridMatch<-colnames(Water) ## might need to play with this somewhat...
-WaterGridMatch<-substring(WaterGridMatch,2)
-WaterGridMatch<-as.numeric(WaterGridMatch)
-WaterGridMatch<-data.frame(WaterGridMatch, WaterGridMatch)
-names(WaterGridMatch)<-c("WGM", "Elev")
-
-WaterGridMatch$Elev<-Elevation$Elevation[match(WaterGridMatch$WGM, Elevation$Unique_ID)]
-WaterGridMatch$Watershed<-Elevation$Watershed[match(WaterGridMatch$WGM,Elevation$Unique_ID)]
-
-## This will get the difference in elevation between each from to each to.
-
-ElevRow<-as.data.frame(matrix(rep(Elevation$Elevation,each=416), ncol=416, byrow=TRUE))
-
-colnames(ElevRow)<-WaterGridMatch$Watershed
-
-ElevDiff<-sweep(ElevRow,2,WaterGridMatch$Elev, FUN="-")
-rownames(ElevDiff)<-Waternames
-ElevDiffNA<-ElevDiff
-colnames(ElevDiffNA)<-WaterGridMatch$WGM
-
-
-##Now we have to remove ones that are not the same watershed
-
-for (i in 1: dim(ElevDiffNA)[2]){
-  p<-(Elevation$Watershed==colnames(ElevDiff)[i])  # This returns a T/F vector for that column
-  ElevDiffNA[,i][!p]<-NA
-}
-
-Uphill<-apply(ElevDiffNA, 2, function(x) { sum (!is.na(x)) })
-
-## To test whether there is a threshold value for uphillness, you could plot the cost path value against
-## the elevation change
-
-plot(ElevDiff[,410], Water[,410])  # this is not really all that succcessful.
-## this should probably be elevdiffna, not elevdiff. 
-
-plot(ElevDiffNA[,210], Water[,270])
-
-#model<-glm(unlist(Water)~unlist(ElevDiff) + unlist(Distdf))
-
-## it looks like the higher values indicate more water flow between two sites. So...
-## Total water flow TO a site would simply be the total of every column.
-
-WaterTotnoDeb<-colSums(Water)
-
-## once we get debris loads we can use this one.
-WaterSinkProp<-Water
-# WaterSinkProp[WaterSinkProp>Toplimit]<-0   ## is it legit to change these to zero??
-# or should I change them to NA and get rid of them?? or ???
-#v <- v[!is.na(v)]
-
-WaterSinkProp<-sweep(WaterSinkProp,2,colSums(WaterSinkProp),`/`)
-WaterSinkTotf<-WaterSinkProp*TotalDebris[,1]
-WaterSinkTot<-colSums(WaterSinkProp*TotalDebris[,1])
-
-
-watermods<-data.frame(Uphill, WaterTotnoDeb,WaterSinkTot, WaterGridMatch$WGM)
-names(watermods)<-c("Uphill", "WaterTotnoDeb", "WaterTotDeb", "WGM")
-
-## We need to find a thresh hold value that determines what values are uphill. 
-# Use same grid as Water, but calculate elevation from minus elevation to, then plot that against costpath.
-# Maybe do this column by column, and use apply (because you're subtracting same elevation in each column)
-
-Waterthresh<-Water
-ColEls<-Elevation$Elevation
-UnIDs<-name
-
-# This is a little bit more complicated. For the number of uphill sites we need to count the 
-## total number of sites in each row that are in the same watershed and at higher elevation (equiv
-# to upwind)
-# 2) 
-
-
-
-
-all<-data.frame(wind)
-all$Uphill<-watermods$Uphill[match(all$WindGridMatch, watermods$WGM)]
-all$WaterTotnoDeb<-watermods$WaterTotnoDeb[match(all$WindGridMatch, watermods$WGM)]
-all$WaterTotDeb<-watermods$WaterTotDeb[match(all$WindGridMatch, watermods$WGM)]
-save(all, file="transitmodels")
-write.csv(all, file="alltransitmodels.csv")
-
-#all$WindSourceIndex<-(all$WindSourceTotf-all$WindSourceSinkf)*all$Total_Debris
-
-
-
-
-## Add wind source, wind sink, and pred to Syd_all data set
-
-Syd_all$Upwind<-all$upwind[match(Syd_all$GridMatch, all$WindGridMatch)]
-Syd_all$WindSink<-all$WindtotNoDeb[match(Syd_all$GridMatch, all$WindGridMatch)]
-Syd_all$WindSinkdis<-all$WinddisttotNodeb[match(Syd_all$GridMatch, all$WindGridMatch)]
-Syd_all$WindSinkdispos<-all$Winddistposonly[match(Syd_all$GridMatch, all$WindGridMatch)]
-Syd_all$Upwinddeb<-all$UpwindDeb[match(Syd_all$GridMatch, all$WindGridMatch)]
-Syd_all$WindSinkdeb<-all$WindSinkTotf[match(Syd_all$GridMatch, all$WindGridMatch)]
-Syd_all$Winddistdeb<-all$Winddistdeb[match(Syd_all$GridMatch, all$WindGridMatch)]
-Syd_all$Uphill<-all$Uphill[match(Syd_all$GridMatch, all$WindGridMatch)]
-Syd_all$WaterSink<-all$WaterTotnoDeb[match(Syd_all$GridMatch, all$WindGridMatch)]
-Syd_all$WaterSinkdeb<-all$WaterTotDeb[match(Syd_all$GridMatch, all$WindGridMatch)]
-Syd_all$Gamresids<-Covars2$Gamresid[match(Syd_all$Global_ID, Covars2$Global_ID)]
-
-
-# Also add grid predictionns to Syd_all dataset
-Syd_all$gridpred<-TotalDebris$x[match(Syd_all$GridMatch, TotalDebris$Unique_ID)]
-plot(Syd_all$gridpred [Syd_all$Source=="KAB"], Syd_all$pred[Syd_all$Source=="KAB"])
-
-### Maybe look at CSIRO predictions using GAM model to see if they are any better
-Gampred<-predict(Gam.CS.M2, newdata=Syd_all[Syd_all$Source=="CSIRO",],type="response", se.fit=TRUE,na.action=na.pass)
-Gampredunlog<-(exp(Gampred$fit)-1)
-Syd_all$Gampred[Syd_all$Source=="CSIRO"]<-Gampredunlog
-
-### This is just CSIRO data set, so we can do predictions on all CSIRO ones separately (e.g. Emu, transect, etc)
-Syd_CSall$Upwind<-all$upwind[match(Syd_CSall$GridMatch, all$WindGridMatch)]
-Syd_CSall$WindSink<-all$WindtotNoDeb[match(Syd_CSall$GridMatch, all$WindGridMatch)]
-Syd_CSall$WindSinkdis<-all$WinddisttotNodeb[match(Syd_CSall$GridMatch, all$WindGridMatch)]
-Syd_CSall$WindSinkdispos<-all$Winddistposonly[match(Syd_CSall$GridMatch, all$WindGridMatch)]
-Syd_CSall$WaterSink<-all$WaterTotnoDeb[match(Syd_CSall$GridMatch, all$WindGridMatch)]
-Syd_CSall$Uphill<-all$Uphill[match(Syd_CSall$GridMatch, all$WindGridMatch)]
-
-
-
-#Syd_Covars$WindSource<-all$WindSourceTotf[match(Covars2$Global_ID, all$Global_ID)]
-
-#Covars2$WindSourceIndex<-all$WindSourceIndex[match(Covars2$Global_ID, all$Global_ID)]
-#Covars2$resids<-Covars2$TotalDebris-Covars2$Pred
 
 
 ### Gam analysis on KAB data #####
