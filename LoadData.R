@@ -46,54 +46,49 @@ library(Hmisc)
 drop_auth()
 drop_dir(path="/NESP")
 
+setwd("/Users/uqqschuy/Documents/R data/NESP/")
+
 #Covars<-drop_read_csv("/NESP/Data/Transect data/Transect_data_all_170217.csv", stringsAsFactors=FALSE)
 #Covarsx<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_290317_UID.csv", stringsAsFactors=FALSE)
-Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_200417_UID.csv", stringsAsFactors=FALSE)
-#Covarsx<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_040417_UID.csv", stringsAsFactors=FALSE)
 
-
-### Find unique site values for Kimberley ###
-#Covars$LL<-paste(Covars$Long, Covars$Lat, sep="")
-
-#NewSEIF<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_070417_UID_SEIF2011.csv", stringsAsFactors=FALSE)
-#NewPop<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_070417_UID_POP2011.csv", stringsAsFactors=FALSE)
-
-#seifmatch<-match(Covars$LL, NewSEIF$UID)
-#popmatch<-match(Covars$LL, NewPop$UID)
-
-## not needed once everything is integrated into one data set ##
-#names(Covars)
-
-Covars$Eco_advan_1km_new<-NewSEIF$Eco_advan_1km[seifmatch]
-
-Covars[,24:43]<-NewSEIF[seifmatch,2:21]
-
-
-Covars$Pop_1km<-NewPop$Pop_1km[popmatch]
-Covars$Pop_5km<-NewPop$Pop_5km[popmatch]
-Covars$Pop_10km<-NewPop$Pop_10km[popmatch]
-Covars$Pop_25km<-NewPop$Pop_25km[popmatch]
-Covars$Pop_50km<-NewPop$Pop_50km[popmatch]
-
-write.csv(Covars, file="/Users/uqqschuy/Documents/R data/NESP/Global_dataset_200417_UID.csv")
-
-drop_upload("/Users/uqqschuy/Documents/R data/NESP/Global_dataset_200417_UID.csv", dest="/NESP/Data/Transect data/Global")
-
-
+Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_80517_UID.csv", stringsAsFactors=FALSE)
 Landcov<-drop_read_csv("/NESP/Data/landuse.csv")
 KABsite<-drop_read_csv("/NESP/Data/Transect data/KAB/KAB_site_types.csv")
+KAB<- drop_read_csv ("/NESP/Data/Transect data/KAB/KAB_AllData_GlID_UID_08_05_17.csv", stringsAsFactors=FALSE)
+CUA <- drop_read_csv("/NESP/Data/Transect data/CUA/CUA_AllData3_UID_22_2_17.csv", stringsAsFactors=FALSE)
+CSIRO<-drop_read_csv ("/NESP/data/transect data/CSIRO/CSIRO_public_collection_only_22_2_17.csv")
+
+Grid<-drop_read_csv("NESP/Data/Grid data/Syd_fishnet_centerpoints_covars_200430_inland.csv", stringsAsFactors=FALSE)
+
+################## SKIP IF INTERNET CONNECTED ######################
+############## for non-internet version: #########################
+
+#write.csv(Grid, file="/Users/uqqschuy/Documents/R data/NESP/Syd_fishnet_centerpoints_covars_200430_inland.csv")
+
+Covars<-read.csv("Global_dataset_80517_UID.csv", stringsAsFactors=FALSE)
+Landcov<-read.csv("landuse.csv")
+KABsite<-read.csv("KAB_site_types.csv")
+KAB<-read.csv("KAB_AllData_GlID_UID_08_05_17.csv") 
+CUA <- read.csv("CUA_AllData3_UID_22_2_17.csv", stringsAsFactors=FALSE)
+CSIRO<-read.csv ("CSIRO_public_collection_only_22_2_17.csv")
+
+Grid<-read.csv("Syd_fishnet_centerpoints_covars_200430_inland.csv", stringsAsFactors=FALSE)
+
+
+################## START HERE ######################
 
 Covars$Year <-as.POSIXlt(strptime(as.character(Covars$Date), format = "%d/%m/%Y"))$year+1900
 Covars$Month <- as.POSIXlt(strptime(as.character(Covars$Date), format = "%d/%m/%Y"))$mon+1
 Covars$Day <- as.POSIXlt(strptime(as.character(Covars$Date), format = "%d/%m/%Y"))$mday
 
 Covars$Source<-as.factor(Covars$Source)
+Covars$State<-as.factor(Covars$State)
+
+
 
 ##### KAB ######
 
 ## get total debris for KAB and put it into Covars dataset
-
-KAB<- drop_read_csv ("/NESP/Data/Transect data/KAB/KAB_AllData_GlID_UID_22_2_17.csv", stringsAsFactors=FALSE)
 
 KAB$Total_Debris<-rowSums(KAB[,grepl("No.of", names(KAB))], na.rm=TRUE)
 
@@ -102,9 +97,6 @@ KABmatch<-match(Covars$UID[Covars$Source=="KAB"], KAB$UID)
 Covars$Total_Debris[Covars$Source=="KAB"]<-KAB$Total_Debris[KABmatch]
 
 ### Now let's look at CUA data ###
-
-
-CUA <- drop_read_csv("/NESP/Data/Transect data/CUA/CUA_AllData3_UID_22_2_17.csv", stringsAsFactors=FALSE)
 
 ### Many of the categories are for some reason not numeric. Change those to numeric and then you can add the columns to get a total
 
@@ -163,7 +155,7 @@ Covars$Total_Debris[Covars$Source=="CUA"]<-CUA$Total_Debris[CUAmatch]
 ##### CSIRO DATA ######
 
 
-CSIRO<-drop_read_csv ("/NESP/data/transect data/CSIRO/CSIRO_public_collection_only_22_2_17.csv")
+
 CSIRO$Total_Debris<-rowSums(CSIRO[,5:236])  
 
 CSmatch<-match(Covars$UID[Covars$Source=="CSIRO"|Covars$Source=="Transect"|Covars$Source=="Emu"], CSIRO$UID)
@@ -176,12 +168,16 @@ Covars$Area_m2<-as.numeric(Covars$Area_m2)
 Covars$Area_m2[Covars$Source=="KAB"]<-1000
 
 Covars$Totper1000<-(Covars$Total_Debris/Covars$Area_m2)*1000
-Covars$All_roads_50<-rowSums(Covars[,64:68], na.rm=TRUE)
-Covars$All_roads_5<-rowSums(Covars[,49:53], na.rm=TRUE)
+Covars$All_roads_50<-rowSums(Covars[,65:69], na.rm=TRUE) 
+Covars$All_roads_5<-rowSums(Covars[,50:54], na.rm=TRUE)   
 Covars$Prim.land<-Landcov$PRIMARY_V7[match(Covars$Landuse_code, Landcov$Landuse)]
 Covars$State<-as.factor(Covars$State)
 
 Covars$roads_5to50km_resids <- lm(Covars$All_roads_5 ~ Covars$All_roads_50)$residuals
+
+Covars$Pop_5km[is.na(Covars$Pop_5km)==TRUE]<-0
+
+Covars$Pop5to50km_resids<-lm(Covars$Pop_5km ~ Covars$Pop_50km)$residuals
 Covars$SiteType<-KABsite$site_type[match(Covars$Global_ID, KABsite$Global_ID)]  ### fix this
 Covars$SiteType[Covars$SiteType=="Car park"]<-"Car Park"
 Covars$SiteType[Covars$SiteType=="Retail"]<-"Retail Strip"
@@ -191,14 +187,17 @@ Covars$SiteType<-droplevels(Covars$SiteType)
 ## put in a log in case of doing gams.
 Covars$Log_Debris<-log(Covars$Totper1000 +1)
 
-## add number of drink containers ###
+## add number of drink containers ### - FIX THIS??
 
-Covars$Containers<-KAB$Containers[match(Covars$UID, KAB$UID)]
+## Covars$Containers<-KAB$Containers[match(Covars$UID, KAB$UID)]
 
 ## add in site code
 Covars$Sitecode<-KAB$sitecode.x[match(Covars$UID, KAB$UID)]
 
+
+
 ### remove NAs in Totper1000 ##
+
 
 Covars2<-Covars[is.finite(Covars$Totper1000)==TRUE,]
 
@@ -210,9 +209,136 @@ Covars2<-Covars2[is.na(Covars2$Prim.land)==FALSE,]
 
 Covars2<-Covars2[is.na(Covars2$Pop_5km)==FALSE,]
 
+## remove ones without a date
+
+Covars2[is.na(Covars2$Year)==TRUE,] ## I think this will take out all of the new data. Let's see if we can find a year for these
 
 Covars2$Pop5to50km_resids <- lm(Covars2$Pop_5km ~ Covars2$Pop_50km)$residuals
 
+
+## problems with the SEIF missing some bits
+
+IDs<-Covars2$Global_ID[is.na(Covars2$eco_resour50km)==TRUE & is.na(Covars$eco_resour25km)==FALSE]
+write.csv(Covars2[is.na(Covars2$eco_resour50km)==TRUE & is.na(Covars$eco_resour25km)==FALSE,], "missingdata.csv")
+
+IDs2<-Covars2$Global_ID[is.na(Covars2$Edu_occupa5km)==TRUE & is.na(Covars2$Edu_occupa1km)==FALSE]
+
+######  Grid data #######
+
+
+#GridSEIF<-drop_read_csv("NESP/Data/Grid data/Sydney_fishnet_centrepoints_seif2011_170412.csv", stringsAsFactors=FALSE) ### fix file name
+
+#Grid[,17:36]<-GridSEIF[,6:25]
+
+#write.csv(Grid, file="/Users/uqqschuy/Documents/R data/NESP/Syd_fishnet_centerpoints_covars_200430_inland.csv")
+
+#drop_upload("/Users/uqqschuy/Documents/R data/NESP/Syd_fishnet_centerpoints_covars_200430_inland.csv", dest="/NESP/Data/Grid data")
+
+
+Grid$State<-as.factor(rep("NSW", times=dim(Grid)[1]))
+
+Grid$All_roads_50<-rowSums(Grid[,57:61], na.rm=TRUE)
+Grid$All_roads_5<-rowSums(Grid[,42:46], na.rm=TRUE)
+
+
+
+#Gridtest<-read.csv("/Users/uqqschuy/Documents/R data/NESP/NESP/Sydney_fishnet_centrepoints_seif2011_170412.csv", stringsAsFactors=FALSE)
+
+
+#### There are a few where landuse is -9999 because the cells are close to the water or on the water. 
+# Change these to water landcover
+
+## Note that there were other cells where landuse was 0, TJ has changed them to nearest landuse value. 
+
+Grid$Landuse[Grid$Landuse<0]<-"663"
+
+Grid$Prim.land<-Landcov$PRIMARY_V7[match(Grid$Landuse, Landcov$Landuse)]
+
+Grid$roads_5to50km_resids<-lm(Grid$All_roads_5 ~ Grid$All_roads_50)$residuals
+Grid$Pop5to50km_resids<-lm(Grid$Pop_5km ~ Grid$Pop_50km)$residuals
+
+#### CHECKING DATA #####
+#length(Grid2$UID[Grid2$Landuse==(-9999)])
+### For some reason there are missing 5 and 50km roads. 
+wrongroads<-Grid$UID[Grid$All_roads_5==0| Grid$All_roads_50==0]
+
+write.csv (wrongroads, file="anomalousroads.csv")
+#### Note that these predictions are using incorrect roads data - need to fix. 
+Grid$pred<-predict(G.K.M2, newdata=Grid,type="response",se.fit = TRUE, na.action = na.pass)
+
+Syd_Covars<-Covars2[Covars2$Lat <= (-33.671774)  & Covars2$Lat >= (-34.265774) & Covars2$Long <= (151.372906) & Covars2$Long >= (150.718096),]
+
+
+
+Syd_KAB<-Syd_Covars[Syd_Covars$Source=="KAB",]
+Syd_CSIRO<-Syd_Covars[Syd_Covars$Source=="CSIRO",]
+Syd_CSall<-Syd_Covars[Syd_Covars$Source=="Emu" | Syd_Covars$Source==
+                        "Transect" | Syd_Covars$Source=="CSIRO",]
+
+Syd_KAB$pred<-predict(G.K.M2, newdata=Syd_KAB, type="response", se.fit=TRUE, na.action=na.pass)
+Syd_KAB$resids<-Syd_KAB$Totper1000-Syd_KAB$pred
+
+Syd_CSIRO$pred<-predict(G.C.M1, newdata=Syd_CSIRO, type="response", se.fit=TRUE, na.action=na.pass)
+Syd_CSIRO$resids<-Syd_CSIRO$Totper1000-Syd_CSIRO$pred
+
+Syd_CSall$pred<-predict(G.Call.M1, newdata=Syd_CSall, type="response", se.fit=TRUE,na.action=na.pass)
+Syd_CSall$resids<-Syd_CSall$Totper1000-Syd_CSall$pred
+
+Syd_all<-rbind(Syd_CSIRO, Syd_KAB)
+
+
+###### TEST GRID COVARS AGAINST TRANSECT COVARS #####
+
+Grid_subset<-Grid[Grid$UID %in% unique(Syd_Covars$UID_1),]
+## for test
+#Gridtest_subset<-Gridtest[Gridtest$UID %in% unique(Syd_Covars$UID_1),]
+
+Syd_Covars_subset<-Syd_Covars[unique(Syd_Covars$UID_1),]
+
+matchindex<-match(Grid_subset$UID, Syd_Covars$UID_1)
+
+
+
+plot(Grid_subset$Eco_advan_50km, Syd_Covars$Eco_advan_50km[matchindex])
+
+plot(Grid_subset$eco_resour50km, Syd_Covars$eco_resour50km[matchindex])
+
+## with new grid variable
+plot(Gridtest_subset$eco_resour5km, Syd_Covars$eco_resour5km[matchindex])
+
+
+plot(Grid_subset$Pop_25km, Syd_Covars$Pop_25km_new[matchindex])
+
+
+### some issues...trying to work them out ####
+
+Syd_subset<-Syd_Covars[matchindex,]
+index<-Syd_subset$Pop_50km<2000000
+plot(Grid_subset$Pop_50km[index], Syd_subset$Pop_50km[index])
+index2<-Syd_subset$Pop_25<400000
+plot(Grid_subset$Pop_25km[index2],Syd_subset$Pop_25km[index2])
+
+index3<-Grid_subset$UID[Grid_subset$eco_resour50km<850]
+
+write.csv(Syd_subset[index2,], file="25km anomalies for TJ.csv")
+write.csv(Syd_subset[Syd_subset$UID_1 %in% index3,],"50km eco_resource anomaly for TJ.csv")
+
+### a few of the transects don't end up in the grid, I think because the grid cell was perhaps cut off. 
+## How shall we address this?
+
+Grid$UID<-as.character(Grid$UID)
+write.csv(unique(Syd_Covars$UID_1[Syd_Covars$UID_1 %nin% Grid$UID]), file="transectinwater.csv")
+
+
+Syd_UID2<-paste(Syd_Covars$Long, Syd_Covars$Lat, sep="")
+Grid_UID2<-paste(Grid$)
+
+
+## TJ went back and changed the UID for these transects to the nearest UID. 
+
+
+## provide csv to Chris and Kimberley because they will need for Winddf and Waterdf and Distdf
+write.csv(Grid[,c("UID","X","Y")], file="new UIDs for transit matrices.csv")
 
 
 

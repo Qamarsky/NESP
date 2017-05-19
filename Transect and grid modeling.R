@@ -29,6 +29,18 @@ set.seed(4183)
 
 ## need to fix up missing variables in Covars2 data. 
 
+## for now...
+
+Covars3<-Covars2[complete.cases(Covars2[,c("Total_Debris","State","Volunteers","RailDistKM","RoadDistKM","Area_m2",
+"Pop_1km","Pop_5km","Pop_10km","Pop_25km","Pop_50km","Eco_advan_1km","Eco_advan_5km",
+"Eco_advan_25km","Eco_advan_50km","eco_disadv1km","eco_disadv5km","eco_disadv10km",
+"eco_disadv25km","eco_disadv50km","eco_resour1km","eco_resour5km","eco_resour10km",
+"eco_resour25km","eco_resour50km","Edu_occupa1km","Edu_occupa5km","Edu_occupa10km","Edu_occupa25km","Edu_occupa50km","All_roads_50","All_roads_5",
+"roads_5to50km_resids","Pop5to50km_resids")]),]
+
+
+
+
 KAB.M1New<- cforest(Total_Debris ~ State + Volunteers + RailDistKM + RoadDistKM + Area_m2 +
                       Pop_1km + Pop_5km + Pop_10km + Pop_25km + Pop_50km + Eco_advan_1km +
                       Eco_advan_5km + Eco_advan_25km + Eco_advan_50km + eco_disadv1km +
@@ -37,13 +49,17 @@ KAB.M1New<- cforest(Total_Debris ~ State + Volunteers + RailDistKM + RoadDistKM 
                       eco_resour50km + Edu_occupa1km + Edu_occupa5km + Edu_occupa10km +
                       Edu_occupa25km + Edu_occupa50km + All_roads_50 + All_roads_5 + 
                       roads_5to50km_resids + Pop5to50km_resids,
-                 data =Covars2[Covars2$Source=="KAB",], 
+                 data =Covars3[Covars3$Source=="KAB",], 
                  controls=cforest_unbiased(ntree=3000, mtry=10))
 
+save(KAB.M1New, file="KAB.M1New.Rdata")
 
-varimp (KAB.M1New) ## this gives the importance of each of the variables
+# load("KAB.M1New.Rdata")
 
-VarKAB<-varimp (KAB.M1New, conditional = TRUE)
+VarKAB<-varimp (KAB.M1New) ## this gives the importance of each of the variables
+
+#VarKAB<-varimp (KAB.M1New, conditional = TRUE)
+save(VarKAB, file="VarKABcond.Rdata")
 
 ## looks like it could be good to use conditional varimp (conditional= TRUE), bedcause that
 # "adjusts for correlations between predictor variables" see Strobl et al. (2008) for details. 
@@ -112,6 +128,43 @@ nt@data <- KAB.M1New@data
 nt@responses <- KAB.M1New@responses 
 
 plot(nt, type="simple")
+
+
+###### PREDICTIONS ON GRID #####
+
+### ctree model unfortunately used a bit of local site level data, so... #####
+
+Grid$Volunteers<-median(Covars$Volunteers[Covars$Source=="KAB"], na.rm=TRUE)
+Grid$Area_m2<-1000
+Grid$Volunteers<-as.integer(Grid$Volunteers)
+levels(Grid$State)<-levels(Covars$State)
+
+pred<-predict(KAB.M1New, newdata=Grid, type="response")
+
+### for some reason throws a class not matching error ###
+
+Covtest<-Covars[,c("State","Volunteers","RailDistKM","RoadDistKM","Area_m2",
+                      "Pop_1km","Pop_5km","Pop_10km","Pop_25km","Pop_50km","Eco_advan_1km",
+                      "Eco_advan_5km","Eco_advan_25km","Eco_advan_50km","eco_disadv1km",
+                      "eco_disadv5km","eco_disadv10km","eco_disadv25km","eco_disadv50km",
+                      "eco_resour1km","eco_resour5km","eco_resour10km","eco_resour25km",
+                      "eco_resour50km","Edu_occupa1km","Edu_occupa5km","Edu_occupa10km",
+                      "Edu_occupa25km","Edu_occupa50km","All_roads_50","All_roads_5",
+                      "roads_5to50km_resids","Pop5to50km_resids")]
+
+
+Gridtest<-Grid[,c("State","Volunteers","RailDistKM","RoadDistKM","Area_m2",
+                 "Pop_1km","Pop_5km","Pop_10km","Pop_25km","Pop_50km","Eco_advan_1km",
+                 "Eco_advan_5km","Eco_advan_25km","Eco_advan_50km","eco_disadv1km",
+                 "eco_disadv5km","eco_disadv10km","eco_disadv25km","eco_disadv50km",
+                 "eco_resour1km","eco_resour5km","eco_resour10km","eco_resour25km",
+                 "eco_resour50km","Edu_occupa1km","Edu_occupa5km","Edu_occupa10km",
+                 "Edu_occupa25km","Edu_occupa50km","All_roads_50","All_roads_5",
+                 "roads_5to50km_resids","Pop5to50km_resids")]
+
+which(sapply(Covtest, class) != sapply(Gridtest, class)) 
+
+
 
 
 

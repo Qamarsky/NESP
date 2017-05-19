@@ -14,7 +14,7 @@
 ###### LOAD WIND #####
 
 Winddf<-drop_read_csv("NESP/analysis/Wind transport/Wind transport matrix.GridToSurveys.csv")
-Winddf<-Winddf[rownames(Winddf) %nin% watercells,] ## remove those cells that are over water and have no covars
+#Winddf<-Winddf[rownames(Winddf) %nin% watercells,] ## remove those cells that are over water and have no covars
 
 #Windnames<-colnames(Winddf)
 colnames(Winddf)<-substring(colnames(Winddf),2)
@@ -25,7 +25,7 @@ colnames(Winddf)<-sub("^([^.]*.[^.]*).", "\\1-",colnames(Winddf))  ### for some 
 ###### LOAD DIST #####
 
 Distdf<-drop_read_csv("NESP/analysis/Wind transport/Distance matrix.GridToSurveys.csv")
-Distdf<-Distdf[rownames(Distdf) %nin% watercells,] ## remove cells that are over water and have no covars
+#Distdf<-Distdf[rownames(Distdf) %nin% watercells,] ## remove cells that are over water and have no covars
 colnames(Distdf)<-substring(colnames(Distdf),2)
 colnames(Distdf)<-sub("^([^.]*.[^.]*).", "\\1-",colnames(Distdf))  ### for some reason Chris' file has changed the "-" to a ".". this changes it back
 
@@ -33,12 +33,12 @@ colnames(Distdf)<-sub("^([^.]*.[^.]*).", "\\1-",colnames(Distdf))  ### for some 
 ##### LOAD WATER #####
 
 
-Water<-drop_read_csv("NESP/Analysis/Water transport/sydney_fishnet_globaldata_costdist_170405.csv")
+Water<-drop_read_csv("NESP/Analysis/Water transport/sydney_fishnet_globaldata_costdist_170411.csv")
 rownames(Water)<-Water[,1]
 
 Water<-Water[,-1]
 #Water<-Water[rownames(Water) %nin% watercells,] ## remove those cells that are over water and have no covars
-Water<-Water[rownames(Water) %in% rownames(Winddf),]
+#Water<-Water[rownames(Water) %in% rownames(Winddf),]
 
 save(Water, file="Water")
 
@@ -47,7 +47,11 @@ save(Water, file="Water")
 
 Grid<-Grid[Grid$UID %in% rownames(Water),]
 Winddf<-Winddf[rownames(Winddf) %in% rownames(Water),]
+Distdf<-Distdf[rownames(Distdf) %in% rownames(Water),]
 
+## for some reason there are Water rows that are not in the Grid/Wind files, so let's get rid of them
+
+Water<-Water[rownames(Water) %in% Grid$UID,]
 
 WindGridMatch<-colnames(Winddf) ## might need to play with this somewhat...
 #WindGridMatch<-substring(WindGridMatch,2)
