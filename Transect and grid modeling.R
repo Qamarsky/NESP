@@ -32,11 +32,11 @@ set.seed(4183)
 ## for now...
 
 Covars3<-Covars2[complete.cases(Covars2[,c("Total_Debris","State","Volunteers","RailDistKM","RoadDistKM","Area_m2",
-"Pop_1km","Pop_5km","Pop_10km","Pop_25km","Pop_50km","Eco_advan_1km","Eco_advan_5km",
-"Eco_advan_25km","Eco_advan_50km","eco_disadv1km","eco_disadv5km","eco_disadv10km",
-"eco_disadv25km","eco_disadv50km","eco_resour1km","eco_resour5km","eco_resour10km",
-"eco_resour25km","eco_resour50km","Edu_occupa1km","Edu_occupa5km","Edu_occupa10km","Edu_occupa25km","Edu_occupa50km","All_roads_50","All_roads_5",
-"roads_5to50km_resids","Pop5to50km_resids")]),]
+                                           "Pop_1km","Pop_5km","Pop_10km","Pop_25km","Pop_50km","Eco_advan_1km","Eco_advan_5km",
+                                           "Eco_advan_25km","Eco_advan_50km","eco_disadv1km","eco_disadv5km","eco_disadv10km",
+                                           "eco_disadv25km","eco_disadv50km","eco_resour1km","eco_resour5km","eco_resour10km",
+                                           "eco_resour25km","eco_resour50km","Edu_occupa1km","Edu_occupa5km","Edu_occupa10km","Edu_occupa25km","Edu_occupa50km","All_roads_50","All_roads_5",
+                                           "roads_5to50km_resids","Pop5to50km_resids")]),]
 
 
 
@@ -49,12 +49,28 @@ KAB.M1New<- cforest(Total_Debris ~ State + Volunteers + RailDistKM + RoadDistKM 
                       eco_resour50km + Edu_occupa1km + Edu_occupa5km + Edu_occupa10km +
                       Edu_occupa25km + Edu_occupa50km + All_roads_50 + All_roads_5 + 
                       roads_5to50km_resids + Pop5to50km_resids,
-                 data =Covars3[Covars3$Source=="KAB",], 
-                 controls=cforest_unbiased(ntree=3000, mtry=10))
+                    data =Covars3[Covars3$Source=="KAB",], 
+                    controls=cforest_unbiased(ntree=3000, mtry=10))
 
 save(KAB.M1New, file="KAB.M1New.Rdata")
 
-# load("KAB.M1New.Rdata")
+
+KAB.M2New<- cforest(Total_Debris ~ State + Volunteers + RailDistKM + RoadDistKM + Area_m2 +
+                      Pop_1km + Pop_5km + Pop_10km + Pop_25km + Pop_50km + Eco_advan_1km +
+                      Eco_advan_5km + Eco_advan_25km + Eco_advan_50km + eco_disadv1km +
+                      eco_disadv5km + eco_disadv10km + eco_disadv25km + eco_disadv50km +
+                      eco_resour1km + eco_resour5km + eco_resour10km + eco_resour25km +
+                      eco_resour50km + Edu_occupa1km + Edu_occupa5km + Edu_occupa10km +
+                      Edu_occupa25km + Edu_occupa50km + All_roads_50 + All_roads_5 + 
+                      roads_5to50km_resids + Pop5to50km_resids,
+                    data =Covars3[Covars3$Source=="KAB",], 
+                    controls=cforest_unbiased(ntree=2001))
+
+### this is KAB model with new SEIF covars as well as not changing default mtry
+
+save(KAB.M2New, file="KAB.M2New.Rdata")
+
+load("KAB.M1New.Rdata") ##### We need to re-run KAB model 
 
 VarKAB<-varimp (KAB.M1New) ## this gives the importance of each of the variables
 
@@ -130,6 +146,21 @@ nt@responses <- KAB.M1New@responses
 plot(nt, type="simple")
 
 
+###### CSIRO CFOREST MODEL #####
+
+CSIRO.M1New<- cforest(Total_Debris ~ State + Volunteers + RailDistKM + RoadDistKM + Area_m2 +
+                      Pop_1km + Pop_5km + Pop_10km + Pop_25km + Pop_50km + Eco_advan_1km +
+                      Eco_advan_5km + Eco_advan_25km + Eco_advan_50km + eco_disadv1km +
+                      eco_disadv5km + eco_disadv10km + eco_disadv25km + eco_disadv50km +
+                      eco_resour1km + eco_resour5km + eco_resour10km + eco_resour25km +
+                      eco_resour50km + Edu_occupa1km + Edu_occupa5km + Edu_occupa10km +
+                      Edu_occupa25km + Edu_occupa50km + All_roads_50 + All_roads_5 + 
+                      roads_5to50km_resids + Pop5to50km_resids,
+                    data =Covars3[Covars3$Source=="CSIRO",], 
+                    controls=cforest_unbiased(ntree=2001))
+
+
+
 ###### PREDICTIONS ON GRID #####
 
 ### ctree model unfortunately used a bit of local site level data, so... #####
@@ -137,37 +168,63 @@ plot(nt, type="simple")
 Grid$Volunteers<-median(Covars$Volunteers[Covars$Source=="KAB"], na.rm=TRUE)
 Grid$Area_m2<-1000
 Grid$Volunteers<-as.integer(Grid$Volunteers)
+Grid$State<-as.factor(Grid$State)
 levels(Grid$State)<-levels(Covars$State)
+Grid$State[Grid$State=='ACT']<-'NSW'
 
-pred<-predict(KAB.M1New, newdata=Grid, type="response")
+pred<-predict(KAB.M2New, newdata=Grid, type="response")
+
+save(pred, file="pred2.RData")
+
+Grid$pred<-pred
 
 ### for some reason throws a class not matching error ###
 
-Covtest<-Covars[,c("State","Volunteers","RailDistKM","RoadDistKM","Area_m2",
-                      "Pop_1km","Pop_5km","Pop_10km","Pop_25km","Pop_50km","Eco_advan_1km",
-                      "Eco_advan_5km","Eco_advan_25km","Eco_advan_50km","eco_disadv1km",
-                      "eco_disadv5km","eco_disadv10km","eco_disadv25km","eco_disadv50km",
-                      "eco_resour1km","eco_resour5km","eco_resour10km","eco_resour25km",
-                      "eco_resour50km","Edu_occupa1km","Edu_occupa5km","Edu_occupa10km",
-                      "Edu_occupa25km","Edu_occupa50km","All_roads_50","All_roads_5",
-                      "roads_5to50km_resids","Pop5to50km_resids")]
+#Covtest<-Covars[,c("State","Volunteers","RailDistKM","RoadDistKM","Area_m2",
+"Pop_1km","Pop_5km","Pop_10km","Pop_25km","Pop_50km","Eco_advan_1km",
+"Eco_advan_5km","Eco_advan_25km","Eco_advan_50km","eco_disadv1km",
+"eco_disadv5km","eco_disadv10km","eco_disadv25km","eco_disadv50km",
+"eco_resour1km","eco_resour5km","eco_resour10km","eco_resour25km",
+"eco_resour50km","Edu_occupa1km","Edu_occupa5km","Edu_occupa10km",
+"Edu_occupa25km","Edu_occupa50km","All_roads_50","All_roads_5",
+"roads_5to50km_resids","Pop5to50km_resids")]
 
 
-Gridtest<-Grid[,c("State","Volunteers","RailDistKM","RoadDistKM","Area_m2",
-                 "Pop_1km","Pop_5km","Pop_10km","Pop_25km","Pop_50km","Eco_advan_1km",
-                 "Eco_advan_5km","Eco_advan_25km","Eco_advan_50km","eco_disadv1km",
-                 "eco_disadv5km","eco_disadv10km","eco_disadv25km","eco_disadv50km",
-                 "eco_resour1km","eco_resour5km","eco_resour10km","eco_resour25km",
-                 "eco_resour50km","Edu_occupa1km","Edu_occupa5km","Edu_occupa10km",
-                 "Edu_occupa25km","Edu_occupa50km","All_roads_50","All_roads_5",
-                 "roads_5to50km_resids","Pop5to50km_resids")]
+#Gridtest<-Grid[,c("State","Volunteers","RailDistKM","RoadDistKM","Area_m2",
+"Pop_1km","Pop_5km","Pop_10km","Pop_25km","Pop_50km","Eco_advan_1km",
+"Eco_advan_5km","Eco_advan_25km","Eco_advan_50km","eco_disadv1km",
+"eco_disadv5km","eco_disadv10km","eco_disadv25km","eco_disadv50km",
+"eco_resour1km","eco_resour5km","eco_resour10km","eco_resour25km",
+"eco_resour50km","Edu_occupa1km","Edu_occupa5km","Edu_occupa10km",
+"Edu_occupa25km","Edu_occupa50km","All_roads_50","All_roads_5",
+"roads_5to50km_resids","Pop5to50km_resids")]
 
-which(sapply(Covtest, class) != sapply(Gridtest, class)) 
+#which(sapply(Covtest, class) != sapply(Gridtest, class)) 
+
+## This finds out that Volunteers doesn't match, so make sure it's an integer. 
+
+##### PREDICTIONS ON TRANSECT DATA #######
+
+####### making predictions on the data based on cforest models for each of the datasets
+
+Syd_KAB$pred<-predict(KAB.M2New, newdata=Syd_KAB, type="response")
+Syd_KAB$resids<-Syd_KAB$Totper1000-Syd_KAB$pred
+
+Syd_CSIRO$pred<-predict(CSIRO.M1New, newdata=Syd_CSIRO, type="response")
+Syd_CSIRO$resids<-Syd_CSIRO$Totper1000-Syd_CSIRO$pred
 
 
+## this was for using Emu picks as well as CSIRO data, but there are only 39, so...
+#Syd_CSall$pred<-predict(G.Call.M1, newdata=Syd_CSall, type="response", se.fit=TRUE,na.action=na.pass)
+#Syd_CSall$resids<-Syd_CSall$Totper1000-Syd_CSall$pred
 
 
+## now amalgamate #
 
+Syd_all<-rbind(Syd_CSIRO, Syd_KAB)
+
+
+#### FROM APC PROJECT ######
 ### We have already done the modelling for full data set, so we should just be able to use this model...
 
 CUA.M1<-ctree(Totalper1000m2~State+ RailDist + TotalRds50 + Prim.land + pop50km + N.Vols + IllegalDump, data=CUA.Sub)

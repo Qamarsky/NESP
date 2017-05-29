@@ -51,7 +51,7 @@ setwd("/Users/uqqschuy/Documents/R data/NESP/")
 #Covars<-drop_read_csv("/NESP/Data/Transect data/Transect_data_all_170217.csv", stringsAsFactors=FALSE)
 #Covarsx<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_290317_UID.csv", stringsAsFactors=FALSE)
 
-Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_80517_UID.csv", stringsAsFactors=FALSE)
+Covars<-drop_read_csv("/NESP/data/transect data/Global/Global_dataset_170516_UID_SEIF2011RoadsFix.csv", stringsAsFactors=FALSE)
 Landcov<-drop_read_csv("/NESP/Data/landuse.csv")
 KABsite<-drop_read_csv("/NESP/Data/Transect data/KAB/KAB_site_types.csv")
 KAB<- drop_read_csv ("/NESP/Data/Transect data/KAB/KAB_AllData_GlID_UID_08_05_17.csv", stringsAsFactors=FALSE)
@@ -65,7 +65,7 @@ Grid<-drop_read_csv("NESP/Data/Grid data/Syd_fishnet_centerpoints_covars_200430_
 
 #write.csv(Grid, file="/Users/uqqschuy/Documents/R data/NESP/Syd_fishnet_centerpoints_covars_200430_inland.csv")
 
-Covars<-read.csv("Global_dataset_80517_UID.csv", stringsAsFactors=FALSE)
+Covars<-read.csv("Global_dataset_80517_UID.csv", stringsAsFactors=FALSE) ### update this!!! ###
 Landcov<-read.csv("landuse.csv")
 KABsite<-read.csv("KAB_site_types.csv")
 KAB<-read.csv("KAB_AllData_GlID_UID_08_05_17.csv") 
@@ -130,6 +130,22 @@ CUA[,173]<-as.numeric(paste(CUA[,173]))
 
 CUA$Total_Debris<-rowSums(CUA[,c(87:109,112:159,161,163:180)], na.rm=TRUE)  ## for some reason many of these rows are not numeric
 
+CUA$Latitude<--(CUA$Latitude)
+
+### get site type
+
+CUA$SiteType<-"Other"
+CUA$SiteType[CUA$River=="Y" | CUA$River=="y"]<-"River"
+CUA$SiteType[CUA$Parks=="Y" | CUA$Parks=="y"]<-"Recreational Park"
+CUA$SiteType[CUA$Beach=="Y" | CUA$Beach=="y"]<-"Beach"
+CUA$SiteType[CUA$Roadway=="Y" | CUA$Roadway=="y"]<-"Highway"
+CUA$SiteType[CUA$PubBushland=="Y" | CUA$PubBushland=="y"]<-"Bushland"
+CUA$SiteType[CUA$School=="Y" | CUA$School=="y"]<-"School"
+CUA$SiteType[CUA$OutdoorTrans=="Y" | CUA$OutdoorTrans=="y"]<-"OutdoorTrans"
+CUA$SiteType[CUA$ShopsMalls=="Y" | CUA$ShopsMalls=="y"]<-"Shopping Centre"
+CUA$SiteType[CUA$DiveSite=="Y" | CUA$DiveSite=="y"]<-"DiveSite"
+
+
 #### Total takes into account the length in meters of wire, pvc, etc. While total calc does not.
 
 
@@ -151,6 +167,8 @@ CUAmatch<-match(Covars$UID[Covars$Source=="CUA"], CUA$UID)
 Covars$Total_Debris[Covars$Source=="CUA"]<-CUA$Total_Debris[CUAmatch]
 
 
+Covars$SiteType[Covars$Source=="CUA"]<-CUA$SiteType[CUAmatch]
+
 
 ##### CSIRO DATA ######
 
@@ -164,25 +182,25 @@ Covars$Total_Debris[Covars$Source=="CSIRO"|Covars$Source=="Transect"|Covars$Sour
 
 
 #### massaging various covariates
-Covars$Area_m2<-as.numeric(Covars$Area_m2)
+#Covars$Area_m2<-as.numeric(Covars$Area_m2)
 Covars$Area_m2[Covars$Source=="KAB"]<-1000
 
 Covars$Totper1000<-(Covars$Total_Debris/Covars$Area_m2)*1000
-Covars$All_roads_50<-rowSums(Covars[,65:69], na.rm=TRUE) 
-Covars$All_roads_5<-rowSums(Covars[,50:54], na.rm=TRUE)   
+Covars$All_roads_50<-rowSums(Covars[,c("DualCarriageRd50km","MinorRd50km","PrincialRd50km","SecondaryRd50km","Track50km")], na.rm=TRUE) 
+Covars$All_roads_5<-rowSums(Covars[,c("DualCarriageRd5km","MinorRd5km","PrincialRd5km","SecondaryRd5km","Track5km")], na.rm=TRUE)   
 Covars$Prim.land<-Landcov$PRIMARY_V7[match(Covars$Landuse_code, Landcov$Landuse)]
-Covars$State<-as.factor(Covars$State)
+#Covars$State<-as.factor(Covars$State)
 
 Covars$roads_5to50km_resids <- lm(Covars$All_roads_5 ~ Covars$All_roads_50)$residuals
 
 Covars$Pop_5km[is.na(Covars$Pop_5km)==TRUE]<-0
 
 Covars$Pop5to50km_resids<-lm(Covars$Pop_5km ~ Covars$Pop_50km)$residuals
-Covars$SiteType<-KABsite$site_type[match(Covars$Global_ID, KABsite$Global_ID)]  ### fix this
+Covars$SiteType[Covars$Source=="KAB"]<-as.character(KABsite$site_type[match(Covars$Global_ID[Covars$Source=="KAB"], KABsite$Global_ID)])  ### fix this
 Covars$SiteType[Covars$SiteType=="Car park"]<-"Car Park"
 Covars$SiteType[Covars$SiteType=="Retail"]<-"Retail Strip"
 Covars$SiteType[Covars$SiteType=="Recreational"]<-"Recreational Park"
-Covars$SiteType<-droplevels(Covars$SiteType)
+Covars$SiteType<-as.factor(Covars$SiteType)
 
 ## put in a log in case of doing gams.
 Covars$Log_Debris<-log(Covars$Totper1000 +1)
@@ -205,15 +223,17 @@ Covars2<-Covars[is.finite(Covars$Totper1000)==TRUE,]
 
 Covars2<-Covars2[is.na(Covars2$Prim.land)==FALSE,]
 
+### remove the two outliers (>10000 items - I think they have been mis-recorded)
+
+Covars2<-Covars2[Covars2$Total_Debris<10000,]
+
 ## remove NAs in pop5km (these are in Melbourne for some reason)
 
-Covars2<-Covars2[is.na(Covars2$Pop_5km)==FALSE,]
+#Covars2<-Covars2[is.na(Covars2$Pop_5km)==FALSE,]
 
 ## remove ones without a date
 
-Covars2[is.na(Covars2$Year)==TRUE,] ## I think this will take out all of the new data. Let's see if we can find a year for these
-
-Covars2$Pop5to50km_resids <- lm(Covars2$Pop_5km ~ Covars2$Pop_50km)$residuals
+#Covars2[is.na(Covars2$Year)==TRUE,] ## I think this will take out all of the new data. Let's see if we can find a year for these
 
 
 ## problems with the SEIF missing some bits
@@ -235,10 +255,10 @@ IDs2<-Covars2$Global_ID[is.na(Covars2$Edu_occupa5km)==TRUE & is.na(Covars2$Edu_o
 #drop_upload("/Users/uqqschuy/Documents/R data/NESP/Syd_fishnet_centerpoints_covars_200430_inland.csv", dest="/NESP/Data/Grid data")
 
 
-Grid$State<-as.factor(rep("NSW", times=dim(Grid)[1]))
+Grid$State<-rep("NSW", times=dim(Grid)[1])
 
-Grid$All_roads_50<-rowSums(Grid[,57:61], na.rm=TRUE)
-Grid$All_roads_5<-rowSums(Grid[,42:46], na.rm=TRUE)
+Grid$All_roads_50<-rowSums(Grid[,c("DualCarriageRd50km","MinorRd50km","PrincialRd50km","SecondaryRd50km","Track50km")], na.rm=TRUE)
+Grid$All_roads_5<-rowSums(Grid[,c("DualCarriageRd50km","MinorRd50km","PrincialRd50km","SecondaryRd50km","Track50km")], na.rm=TRUE)
 
 
 
@@ -264,7 +284,8 @@ wrongroads<-Grid$UID[Grid$All_roads_5==0| Grid$All_roads_50==0]
 
 write.csv (wrongroads, file="anomalousroads.csv")
 #### Note that these predictions are using incorrect roads data - need to fix. 
-Grid$pred<-predict(G.K.M2, newdata=Grid,type="response",se.fit = TRUE, na.action = na.pass)
+
+# Grid$pred<-predict(G.K.M2, newdata=Grid,type="response",se.fit = TRUE, na.action = na.pass)
 
 Syd_Covars<-Covars2[Covars2$Lat <= (-33.671774)  & Covars2$Lat >= (-34.265774) & Covars2$Long <= (151.372906) & Covars2$Long >= (150.718096),]
 
@@ -275,16 +296,6 @@ Syd_CSIRO<-Syd_Covars[Syd_Covars$Source=="CSIRO",]
 Syd_CSall<-Syd_Covars[Syd_Covars$Source=="Emu" | Syd_Covars$Source==
                         "Transect" | Syd_Covars$Source=="CSIRO",]
 
-Syd_KAB$pred<-predict(G.K.M2, newdata=Syd_KAB, type="response", se.fit=TRUE, na.action=na.pass)
-Syd_KAB$resids<-Syd_KAB$Totper1000-Syd_KAB$pred
-
-Syd_CSIRO$pred<-predict(G.C.M1, newdata=Syd_CSIRO, type="response", se.fit=TRUE, na.action=na.pass)
-Syd_CSIRO$resids<-Syd_CSIRO$Totper1000-Syd_CSIRO$pred
-
-Syd_CSall$pred<-predict(G.Call.M1, newdata=Syd_CSall, type="response", se.fit=TRUE,na.action=na.pass)
-Syd_CSall$resids<-Syd_CSall$Totper1000-Syd_CSall$pred
-
-Syd_all<-rbind(Syd_CSIRO, Syd_KAB)
 
 
 ###### TEST GRID COVARS AGAINST TRANSECT COVARS #####

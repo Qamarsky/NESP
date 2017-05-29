@@ -40,7 +40,7 @@ Water<-Water[,-1]
 #Water<-Water[rownames(Water) %nin% watercells,] ## remove those cells that are over water and have no covars
 #Water<-Water[rownames(Water) %in% rownames(Winddf),]
 
-save(Water, file="Water")
+#save(Water, file="Water")
 
 ### there is a chunk of the Water matrix that didn't get values because it's off of the DEM. So let's remove
 # these grid cells from Grid, Wind, and Dist matrices. 
@@ -63,10 +63,12 @@ TotalDebris<-Grid[,c("pred","UID")]
 #TotalDebris<-as.vector(TotalDebris)
 
 ## because we don't actually have total debris predicted per each cell, the best hyptheses we can make are:
-# 1) Amont of debris is somehow related to how many upwind cells there are (upwind)
+# 1) Amont of debris is somehow related to total number of upwind cells (upwind)
 # 2) Amount of debris is somehow related to how much total wind comes from those cells
-##  This you would do by adding the total positive values for every column
-## 3) And finally, you could relate to distance. The greater the distance, the less would be transported
+## a) This you would do by adding the total positive values for every column
+## b) And you could add the total amount of debris coming from upwind cells
+## c) Amount of debris is the proportion of wind that comes from a particular cell * debris in that cell
+# 3) And finally, you could relate to distance. The greater the distance, the less would be transported
 ## so for this, take the sign of each wind direction, and multiply it by the distance. Then do an inverse
 ## for each cell, so greater distances have less value. Then just add the postive values. This gives you basically the number
 ## of upwind cells, weighted by distance.
@@ -75,56 +77,53 @@ TotalDebris<-Grid[,c("pred","UID")]
 ## 1) how many cells in each column are positive??
 upwind<-apply(Winddf, 2, function(x) { sum (x>0) })
 
-# this one only valid if we have debris preds for all grid cells 
+### 2 Total wind coming from upwind cells: 
+# 2a) Just use straight colsums (for pos values)
 WindSinkPos<-Winddf
 WindSinkPos[WindSinkPos<0]<-0  ## basically changes all negative values to zeros - only counting the proportion of the debris that comes FROM sites
+#WindtotNoDeb<-colSums(WindSinkPos)
 
-## Next few lines are for when we have debris 
 
+# 2b) Number of upwind cells times the amount of debris coming from them (not amount of wind, just whether upwind or not)
+Windsign<-Winddf
+Windsign[Winddf>0]<-1
+Windsign[Winddf<0]<-(-1)
+Windsignpos<-Windsign
+Windsignpos[Windsignpos<0]<-0
+UpwindDeb<-colSums(WindSignPos*TotalDebris[match(rownames(Winddf), TotalDebris$UID),1])
+
+
+# 2b) ## We can do the proportion of debris coming from upwind cells times debris in each of those upwind cells.
 WindSinkPropPos<-sweep(WindSinkPos,2,colSums(WindSinkPos),`/`) ### this gives you the proportion of wind transport from each grid cell (row) to each transect cell (column)
-
-# multiply proportion of wind in each cell by the amount of debris in that cell      WindSinkTot<-sweep(WindSinkPropPos,1,TotalDebris,'*')
-WindSinkTot<-WindSinkPropPos*TotalDebris[,1]
-WindSinkTotf<-colSums(WindSinkTot) ###MUST MATCH THIS WITH PROPER GRIDMATCH VALUES because total debris may be in different order from wind. 
 
 ## This WindSinkPropPos gives me the proportion of the debris that is in my cell that came FROM every other cell.
 ## so you can create a prediction grid (or portion thereof) that presumes that all cells are sinks, and all of the
 ## debris in them came from somewhere else. So if we multiply every colsum proportion by the total amount of
 ## debris that was predicted for each of our sites (since it's a subset), then we can ....
 
+# multiply proportion of wind in each cell by the amount of debris in that cell      WindSinkTot<-sweep(WindSinkPropPos,1,TotalDebris,'*')
+###MUST MATCH THIS WITH PROPER GRIDMATCH VALUES because total debris may be in different order from wind. 
 
+windmatch<-match(rownames(WindSinkPropPos), TotalDebris$UID)
+WindSinkTot<-WindSinkPropPos*TotalDebris[windmatch,1]  
+WindSinkTotf<-colSums(WindSinkTot) 
 
-#2 Just use straight colsums (for pos values)
-WindtotNoDeb<-colSums(WindSinkPos)
-
-#3) 
-
-Windsign<-Winddf
-Windsign[Winddf>0]<-1
-Windsign[Winddf<0]<-(-1)
-
-## We can do upwind cells times debris in each of those upwind cells. 
-Windsignpos<-Windsign
-Windsignpos[Windsignpos<0]<-0
-UpwindDeb<-colSums(Windsignpos*TotalDebris[,1])
-
-
-## Now we do upwind cells divided by distance
-Winddist<-Windsign/Distdf
+## 3  Now we do upwind cells divided by distance
+Winddist<-Windsign/Distdf[match(rownames(Winddf), rownames(Distdf)),]  ## both pos and neg (-1 or +1)
 #is.na(Winddist) <- do.call(cbind,lapply(Winddist, is.infinite)) ## change Inf values to NA
 
 WinddisttotNodeb<-colSums(Winddist, na.rm=TRUE) ## this is of course both pos and neg.
-Winddistpos<-Windsignpos
-Winddistpos<-Winddistpos/Distdf
+Winddistpos<-Winddist 
+Winddistpos[Winddist<0]<-0 ## number of upwind 
 
 #is.na(Winddistpos) <- do.call(cbind,lapply(Winddistpos, is.infinite)) ## change Inf values to NA
 
 Winddistposonly<-colSums(Winddistpos, na.rm=TRUE)
 
-## Now let's do wind dist proportional, and multiply by debris
-
-Winddistprop<-sweep(Winddistpos,2,Winddistposonly,`/`) ##That way we don't run into NA values
-Winddistdeb<-colSums(Winddistprop*TotalDebris[,1], na.rm=T)
+## Now let's do total wind divided by the distance, and multiply by debris
+Winddistprop<-Winddf/Distdf
+Winddistprop[Winddistprop<0]<-0 ## just looking at upwind cells
+Winddistdeb<-colSums(Winddistprop*TotalDebris[match(rownames(Winddf), TotalDebris$UID),1], na.rm=T)
 
 wind<-data.frame(upwind, WindtotNoDeb,WinddisttotNodeb, Winddistposonly, WindSinkTotf, UpwindDeb, Winddistdeb, WindGridMatch)
 
@@ -142,12 +141,12 @@ Elevation<-read.csv("~/Documents/R data/NOAAOC/APC/grid_covars_100816_wtshd.csv"
 
 WaterGridMatch<-colnames(Water) ## might need to play with this somewhat...
 WaterGridMatch<-substring(WaterGridMatch,2)
-WaterGridMatch<-as.numeric(WaterGridMatch)
+WaterGridMatch<-sub("^([^.]*.[^.]*).", "\\1-",WaterGridMatch)  ### for some reason Chris' file has changed the "-" to a ".". this changes it back
 WaterGridMatch<-data.frame(WaterGridMatch, WaterGridMatch)
 names(WaterGridMatch)<-c("WGM", "Elev")
 
-WaterGridMatch$Elev<-Elevation$Elevation[match(WaterGridMatch$WGM, Elevation$Unique_ID)]
-WaterGridMatch$Watershed<-Elevation$Watershed[match(WaterGridMatch$WGM,Elevation$Unique_ID)]
+WaterGridMatch$Elev<-Grid$elevation[match(WaterGridMatch$WGM, Grid$UID)]
+WaterGridMatch$Watershed<-Grid$Watershed[match(WaterGridMatch$WGM,Grid$UID)]
 
 ## This will get the difference in elevation between each from to each to.
 
