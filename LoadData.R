@@ -44,7 +44,7 @@ library(Hmisc)
 ##### Add in transect data ####
 
 drop_auth()
-drop_dir(path="/NESP")
+#drop_dir(path="/NESP")
 
 setwd("/Users/uqqschuy/Documents/R data/NESP/")
 
@@ -58,7 +58,8 @@ KAB<- drop_read_csv ("/NESP/Data/Transect data/KAB/KAB_AllData_GlID_UID_08_05_17
 CUA <- drop_read_csv("/NESP/Data/Transect data/CUA/CUA_AllData3_UID_22_2_17.csv", stringsAsFactors=FALSE)
 CSIRO<-drop_read_csv ("/NESP/data/transect data/CSIRO/CSIRO_public_collection_only_22_2_17.csv")
 
-Grid<-drop_read_csv("NESP/Data/Grid data/Syd_fishnet_centerpoints_covars_200430_inland.csv", stringsAsFactors=FALSE)
+Grid<-drop_read_csv("NESP/Data/Grid data/Syd_fishnet_roadcorrections_170601.csv", stringsAsFactors=FALSE)
+
 
 ################## SKIP IF INTERNET CONNECTED ######################
 ############## for non-internet version: #########################
@@ -76,7 +77,7 @@ Grid<-read.csv("Syd_fishnet_centerpoints_covars_200430_inland.csv", stringsAsFac
 
 
 ################## START HERE ######################
-
+Covars$Date_format<-as.POSIXlt(strptime(as.character(Covars$Date), format = "%d/%m/%Y"))
 Covars$Year <-as.POSIXlt(strptime(as.character(Covars$Date), format = "%d/%m/%Y"))$year+1900
 Covars$Month <- as.POSIXlt(strptime(as.character(Covars$Date), format = "%d/%m/%Y"))$mon+1
 Covars$Day <- as.POSIXlt(strptime(as.character(Covars$Date), format = "%d/%m/%Y"))$mday
@@ -92,9 +93,18 @@ Covars$State<-as.factor(Covars$State)
 
 KAB$Total_Debris<-rowSums(KAB[,grepl("No.of", names(KAB))], na.rm=TRUE)
 
+KAB$Containers<-rowSums(KAB[,c("No.of.Gb","No.of.Gc","No.of.Gd","No.of.Ge", "No.of.Gf", "No.of.Gh","No.of.Gk", "No.of.Gm",
+                               "No.of.Gn","No.of.Ma","No.of.Mb","No.of.Mc", "No.of.Md","No.of.Me","No.of.Pc","No.of.Pe",
+                               "No.of.Pg","No.of.Ph","No.of.Pi","No.of.Pj", "No.of.Pk","No.of.Ke","No.of.Kf","No.of.Kg",
+                               "No.of.Ki")], na.rm=TRUE)
+
+KAB$Lids<-rowSums(KAB[,c("No.of.Mi", "No.of.Px")], na.rm=TRUE)
+
 KABmatch<-match(Covars$UID[Covars$Source=="KAB"], KAB$UID)
 
 Covars$Total_Debris[Covars$Source=="KAB"]<-KAB$Total_Debris[KABmatch]
+Covars$Containers[Covars$Source=="KAB"]<-KAB$Containers[KABmatch]
+Covars$Lids[Covars$Source=="KAB"]<-KAB$Lids[KABmatch]
 
 ### Now let's look at CUA data ###
 
@@ -145,6 +155,27 @@ CUA$SiteType[CUA$OutdoorTrans=="Y" | CUA$OutdoorTrans=="y"]<-"OutdoorTrans"
 CUA$SiteType[CUA$ShopsMalls=="Y" | CUA$ShopsMalls=="y"]<-"Shopping Centre"
 CUA$SiteType[CUA$DiveSite=="Y" | CUA$DiveSite=="y"]<-"DiveSite"
 
+### get States fixed up ##
+
+
+rownames(CUA[CUA$State==" ",]) ## 786-788, 891-893, 1764
+CUA$State[786]<-"QLD"
+CUA$State[787]<-"VIC"
+CUA$State[788]<-"NSW"
+CUA$State[891]<-"NSW"
+CUA$State[892]<-"TAS"
+CUA$State[893]<-"WA"
+CUA$State[1764]<-"VIC"
+
+CUA$State[CUA$State=="Vic"]<-"VIC"
+
+CUA$State<-as.factor(CUA$State)
+
+#CUA$Containers<-rowSums(CUA2[,c(96:98,122,125,126,149:150)])
+CUA$Containers<-rowSums(CUA[,c("PET.drink.containers","Fruit.juice","non.PET.containers","alcoholic.bev.bott","soft.drink.bottles",
+                               "fruit.juice.bottles","alcoholic.bev","soft.drink")])
+CUA$Lids<-rowSums(CUA[,c("Bottle.caps.lids","bottle.caps")])
+
 
 #### Total takes into account the length in meters of wire, pvc, etc. While total calc does not.
 
@@ -168,6 +199,8 @@ Covars$Total_Debris[Covars$Source=="CUA"]<-CUA$Total_Debris[CUAmatch]
 
 
 Covars$SiteType[Covars$Source=="CUA"]<-CUA$SiteType[CUAmatch]
+Covars$Containers[Covars$Source=="CUA"]<-CUA$Containers[CUAmatch]
+Covars$Lids[Covars$Source=="CUA"]<-CUA$Containers[CUAmatch]
 
 
 ##### CSIRO DATA ######
@@ -188,6 +221,11 @@ Covars$Area_m2[Covars$Source=="KAB"]<-1000
 Covars$Totper1000<-(Covars$Total_Debris/Covars$Area_m2)*1000
 Covars$All_roads_50<-rowSums(Covars[,c("DualCarriageRd50km","MinorRd50km","PrincialRd50km","SecondaryRd50km","Track50km")], na.rm=TRUE) 
 Covars$All_roads_5<-rowSums(Covars[,c("DualCarriageRd5km","MinorRd5km","PrincialRd5km","SecondaryRd5km","Track5km")], na.rm=TRUE)   
+Covars$All_roads_10<-rowSums(Covars[,c("DualCarriageRd10km","MinorRd10km","PrincialRd10km","SecondaryRd10km","Track10km")], na.rm=TRUE) 
+Covars$All_roads_25<-rowSums(Covars[,c("DualCarriageRd25km","MinorRd25km","PrincialRd25km","SecondaryRd25km","Track25km")], na.rm=TRUE)   
+Covars$All_roads_1<-rowSums(Covars[,c("DualCarriageRd1km","MinorRd1km","PrincialRd1km","SecondaryRd1km","Track1km")], na.rm=TRUE) 
+
+
 Covars$Prim.land<-Landcov$PRIMARY_V7[match(Covars$Landuse_code, Landcov$Landuse)]
 #Covars$State<-as.factor(Covars$State)
 
@@ -210,38 +248,48 @@ Covars$Log_Debris<-log(Covars$Totper1000 +1)
 ## Covars$Containers<-KAB$Containers[match(Covars$UID, KAB$UID)]
 
 ## add in site code
-Covars$Sitecode<-KAB$sitecode.x[match(Covars$UID, KAB$UID)]
+Covars$Sitecode<-as.factor(KAB$sitecode.x[match(Covars$UID, KAB$UID)])
 
 
+############# Remove outliers and NA values #########
 
 ### remove NAs in Totper1000 ##
 
-
 Covars2<-Covars[is.finite(Covars$Totper1000)==TRUE,]
 
-## remove NAs in Prim.land (these are all on Heron Island)
+## remove NAs in Prim.land - never mind, just leave them in. 
 
-Covars2<-Covars2[is.na(Covars2$Prim.land)==FALSE,]
+#Covars2<-Covars2[is.na(Covars$Prim.land)==FALSE,]
 
 ### remove the two outliers (>10000 items - I think they have been mis-recorded)
 
 Covars2<-Covars2[Covars2$Total_Debris<10000,]
 
+
+##### remove a couple of outliers in roads
+## I think if there are NAs in the roads it gets confusing
+testcovar<-Covars2[,c(46:68)]
+names(testcovar)
+
+################### WARNING COL NUMBERS USED HERE #######################
+#################### CHECK THEM IF FILE HAS CHANGED ########################
+
+Covars2[,c(46:68)][is.na(Covars2[,c(46:68)])==TRUE]<-0  ### this removes NAs from road values
+## looks like there are some na values in the SEIF also
+Covars2[,c(24:43)][is.na(Covars2[,c(24:43)])==TRUE]<-0
+                  
+
+Covars2<-Covars2[Covars2$MinorRd5km<1000,]
+Covars2<-Covars2[Covars2$Edu_occupa1km>0,]
+
 ## remove NAs in pop5km (these are in Melbourne for some reason)
 
-#Covars2<-Covars2[is.na(Covars2$Pop_5km)==FALSE,]
+#Covars<-Covars[is.na(Covars$Pop_5km)==FALSE,]
 
 ## remove ones without a date
 
-#Covars2[is.na(Covars2$Year)==TRUE,] ## I think this will take out all of the new data. Let's see if we can find a year for these
+#Covars[is.na(Covars$Year)==TRUE,] ## I think this will take out all of the new data. Let's see if we can find a year for these
 
-
-## problems with the SEIF missing some bits
-
-IDs<-Covars2$Global_ID[is.na(Covars2$eco_resour50km)==TRUE & is.na(Covars$eco_resour25km)==FALSE]
-write.csv(Covars2[is.na(Covars2$eco_resour50km)==TRUE & is.na(Covars$eco_resour25km)==FALSE,], "missingdata.csv")
-
-IDs2<-Covars2$Global_ID[is.na(Covars2$Edu_occupa5km)==TRUE & is.na(Covars2$Edu_occupa1km)==FALSE]
 
 ######  Grid data #######
 
@@ -258,8 +306,10 @@ IDs2<-Covars2$Global_ID[is.na(Covars2$Edu_occupa5km)==TRUE & is.na(Covars2$Edu_o
 Grid$State<-rep("NSW", times=dim(Grid)[1])
 
 Grid$All_roads_50<-rowSums(Grid[,c("DualCarriageRd50km","MinorRd50km","PrincialRd50km","SecondaryRd50km","Track50km")], na.rm=TRUE)
-Grid$All_roads_5<-rowSums(Grid[,c("DualCarriageRd50km","MinorRd50km","PrincialRd50km","SecondaryRd50km","Track50km")], na.rm=TRUE)
-
+Grid$All_roads_5<-rowSums(Grid[,c("DualCarriageRd5km","MinorRd5km","PrincialRd5km","SecondaryRd5km","Track5km")], na.rm=TRUE)
+Grid$All_roads_10<-rowSums(Grid[,c("DualCarriageRd10km","MinorRd10km","PrincialRd10km","SecondaryRd10km","Track10km")], na.rm=TRUE)
+Grid$All_roads_25<-rowSums(Grid[,c("DualCarriageRd25km","MinorRd25km","PrincialRd25km","SecondaryRd25km","Track25km")], na.rm=TRUE)
+Grid$All_roads_1<-rowSums(Grid[,c("DualCarriageRd1km","MinorRd1km","PrincialRd1km","SecondaryRd1km","Track1km")], na.rm=TRUE)
 
 
 #Gridtest<-read.csv("/Users/uqqschuy/Documents/R data/NESP/NESP/Sydney_fishnet_centrepoints_seif2011_170412.csv", stringsAsFactors=FALSE)
@@ -308,9 +358,9 @@ Syd_Covars_subset<-Syd_Covars[unique(Syd_Covars$UID_1),]
 
 matchindex<-match(Grid_subset$UID, Syd_Covars$UID_1)
 
+Grid_subset$Transect_
 
-
-plot(Grid_subset$Eco_advan_50km, Syd_Covars$Eco_advan_50km[matchindex])
+plot(Grid_subset$Eco_advan_5km, Syd_Covars$Eco_advan_5km[matchindex])
 
 plot(Grid_subset$eco_resour50km, Syd_Covars$eco_resour50km[matchindex])
 
@@ -318,8 +368,9 @@ plot(Grid_subset$eco_resour50km, Syd_Covars$eco_resour50km[matchindex])
 plot(Gridtest_subset$eco_resour5km, Syd_Covars$eco_resour5km[matchindex])
 
 
-plot(Grid_subset$Pop_25km, Syd_Covars$Pop_25km_new[matchindex])
+plot(Grid_subset$Pop_25km, Syd_Covars$Pop_25km[matchindex])
 
+plot(Grid_subset$PrincialRd50km, Syd_Covars$PrincialRd50km[matchindex])
 
 ### some issues...trying to work them out ####
 
